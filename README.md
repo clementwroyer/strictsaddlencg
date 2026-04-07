@@ -18,7 +18,7 @@ Starting point: [Paper by Chan--Renous-Legoubin and Royer on nonlinear CG (NCG) 
 
 *First step: Understand the line-search variant to see what assumptions are needed.*
 
-### Question 3: Can we show that the nonconvex regression problem is strict saddle?
+## Question 3: Can we show that the nonconvex regression problem is strict saddle?
 
 - Same references than in question 1, but different focus (how to show that a function is strict saddle)
 
