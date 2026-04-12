@@ -1,0 +1,476 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage[margin=1in]{geometry}
+\newtheorem{definition}{Definition}
+
+\title{Hybrid Nonlinear Conjugate Gradient and Negative Curvature Descent}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{For Clément and I to see where we are, and where we are going}
+In this work, we revisit the Hybrid Gradient and Negative Curvature Descent from~\cite{WrightMa2022}
+using the Non-linear Conjugate Gradient with modified restart from~\cite{RoyerChan2022}. 
+The first part is an analysis of the complexity of the Hybrid Non-Linear Conjugate Gradient (NCG) and Negative Curvature Descent (NCD) algorithm
+for an arbitrary non-convex function. We study this setting under the hypothesis that we know the Lipschitz constants. Therefore, no line search is performed in this case.
+This is the trivial case where the complexity of the algorithm is simply the sum of the complexities found in the two papers mentioned:
+\begin{equation}
+    K = O(\epsilon_g^{-2} + \epsilon_g^{-\max\{1+p, 2(1+p-q)\}} + \epsilon_H^{-3})
+\end{equation}
+
+Subsequently, we analyze the hybrid framework under the hypothesis that the non-convex function follows the strict saddle property. 
+This setting gives us three regimes to analyze based on the strit saddle conditions:
+\begin{itemize}
+    \item \textbf{Regime 1}: High gradient. In this case, we apply the standard NCG algorithm considered in~\cite{RoyerChan2022}. We get the same complexity (up to constants):
+    \begin{equation}
+        K = O(\alpha^{-2} + \alpha^{-\max\{1+p, 2(1 + p - q)\}})
+    \end{equation}
+    \item \textbf{Regime 2}: Negative Curvature. In this case, we apply the standard NCD algroithm considered in~\cite{WrightMa2022}. We get the same complexity:
+    \begin{equation}
+        K = O(\beta^{-3})
+    \end{equation}
+    \item \textbf{Regime 3}: Local strong convexity. This case is where we innovate. It further partitions the analysis into 3 cases:
+        \begin{itemize}
+        \item The power $1+p-q = 1$: This case gives us the same rate as the restarted case (i.e. Gradient Descent)
+        \item The power $1+p-q$ is different from one. This gives us new complexities shown in Section~\ref{subsec:regime_3_SS}.
+    \end{itemize}
+\end{itemize}
+
+The next step (starting monday April 13th) is to see if when we are in regime 3, we stay there. This would mean that on some occasions, with the right choice of 
+hyperparameters $p$ and $q$, we could get exact convergence to a minimizer.
+
+\section{Complexity Analysis for an Arbitrary Non Convex Function, Without Line Search}
+\label{sec:complex_arbitrary_lip}
+
+\subsection{Setting}
+
+We consider
+\[
+\min_{x \in \mathbb{R}^n} f(x),
+\]
+where $f : \mathbb{R}^n \to \mathbb{R}$ is twice continuously differentiable, with $L_1$-Lipschitz gradient and $L_2$-Lipschitz Hessian. We write $g_k = \nabla f(x_k)$.
+
+Given a target accuracy $\varepsilon > 0$, we seek an $\varepsilon$-approximate second-order stationary point:
+\[
+\|\nabla f(x_\star)\| \leq \varepsilon_g, \qquad -\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H.
+\]
+
+We define the following constants from the complexity analysis of Algorithm~1 in~\cite{RoyerChan2022}:
+\[
+c_{\mathcal{R}} := \eta \min\left\{1,\; \frac{2(1-\eta)\theta}{L_1}\right\}, \qquad
+c_{\mathcal{N}} := \eta\sigma \min\left\{1,\; \frac{2(1-\eta)\sigma\theta}{\kappa^2 L_1}\right\}.
+\]
+
+Let $\varepsilon_g$ and $\varepsilon_H$ be the thresholds used in Algorithm~\ref{algo:NCG_NCD_Lip} to determine when NCG or NCD are performed, respectively.
+From Lemma 3.1 of~\cite{RoyerChan2022}, non-restarted iterations satisfy:
+\[
+f(x_k) - f(x_{k+1}) > c_{\mathcal{N}} \min\left\{\|g_k\|^{1+p},\; \|g_k\|^{2(1+p-q)}\right\} \geq c_{\mathcal{N}} \min\left\{\varepsilon_g^{1+p},\; \varepsilon_g^{2(1+p-q)}\right\} = \varepsilon.
+\]
+
+\textbf{Case 1:} If the minimum is $\varepsilon_g^{1+p}$:
+\[
+c_{\mathcal{N}} \varepsilon_g^{1+p} = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/(1+p)}.
+\]
+
+\textbf{Case 2:} If the minimum is $\varepsilon_g^{2(1+p-q)}$:
+\[
+c_{\mathcal{N}} \varepsilon_g^{2(1+p-q)} = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/2(1+p-q)}.
+\]
+
+Since we do not know which case holds, the binding exponent is $\max\{1+p,\; 2(1+p-q)\}$, giving:
+\[
+\varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/\max\{1+p,\; 2(1+p-q)\}}.
+\]
+
+From Lemma 3.2, restarted iterations satisfy:
+\[
+f(x_k) - f(x_{k+1}) > c_{\mathcal{R}} \|g_k\|^2 \geq c_{\mathcal{R}} \varepsilon_g^2.
+\]
+Setting this equal to $\varepsilon$:
+\[
+c_{\mathcal{R}} \varepsilon_g^2 = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{R}}}\right)^{1/2}.
+\]
+
+Since we need $\|g_k\| \geq \varepsilon_g$ to guarantee a per-iteration decrease of at least $\varepsilon$ regardless of the iteration type (restarted or not):
+\begin{equation}
+    \boxed{\varepsilon_g = \max\left\{\left(\frac{\varepsilon}{c_{\mathcal{R}}}\right)^{1/2},\; \left(\frac{\varepsilon}{c_N}\right)^{1/\max\{1+p,\; 2(1+p-q)\}}\right\}.}
+\end{equation}
+
+$\varepsilon_H$ from~\cite{WrightMa2022} is 
+\begin{equation}
+    \boxed{\varepsilon_H = \left(\frac{3}{2}L_2^2\varepsilon\right)^{\frac{1}{3}}}
+\end{equation}
+
+The restart condition is defined as:
+\begin{equation}
+\label{eq:restart}
+g_{k+1}^T d_{k+1} \geq -\sigma\|g_{k+1}\|^{1+p} \quad \text{or} \quad \|d_{k+1}\| \geq \kappa\|g_{k+1}\|^q.
+\end{equation}
+
+\begin{algorithm}[H]
+\caption{Hybrid NCG + Negative Curvature Descent (Known $L_1$, $L_2$)}
+\label{algo:NCG_NCD_Lip}
+\KwIn{$x_0 \in \mathbb{R}^n$, $\eta \in (0,1)$, $\theta \in (0,1)$, $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, $\varepsilon > 0$.}
+
+\BlankLine
+\textbf{Setup:}
+\[
+\varepsilon_g = \max\left\{\left(\frac{\varepsilon}{c_R}\right)^{1/2},\; \left(\frac{\varepsilon}{c_N}\right)^{1/\max\{1+p,\, 2(1+p-q)\}}\right\}, \qquad
+\varepsilon_H = \left(\frac{3 L_2^2\, \varepsilon}{2}\right)^{1/3}.
+\]
+
+Set $g_0 = \nabla f(x_0)$, $d_0 = -g_0$.
+
+\BlankLine
+\For{$k = 0, 1, 2, \ldots$}{
+
+    Compute $g_k = \nabla f(x_k)$.
+
+    \BlankLine
+    \eIf{$\|g_k\| \geq \varepsilon_g$}{
+        \tcc{NCG phase}
+        Compute $\alpha_k = \theta^{j_k}$ where $j_k$ is the smallest nonnegative integer such that
+        \begin{equation}
+            f(x_k + \alpha_k d_k) < f(x_k) + \eta\, \alpha_k\, g_k^T d_k.
+        \end{equation}
+        
+        Set $x_{k+1} = x_k + \alpha_k d_k$ and $g_{k+1} = \nabla f(x_{k+1})$.
+
+        Choose conjugate direction parameter $\beta_{k+1}$.
+
+        Set $d_{k+1} = -g_{k+1} + \beta_{k+1} d_k$.
+
+        \If{condition~\eqref{eq:restart} holds}{
+            Restart: $d_{k+1} \leftarrow -g_{k+1}$.
+        }
+    }{
+        Compute the smallest eigenvalue $\lambda_k$ and eigenvector $e_k$ of $\nabla^2 f(x_k)$, choosing the sign such that $\langle g_k, e_k \rangle \leq 0$.
+
+        \BlankLine
+        \eIf{$-\lambda_k \geq \varepsilon_H$}{
+            \tcc{Negative curvature phase}
+            \[
+            x_{k+1} = x_k + \frac{2\lambda_k}{L_2}\, e_k.
+            \]
+            Reset $d_{k+1} = -\nabla f(x_{k+1})$.
+        }{
+            \textbf{Stop} and return $x_\star = x_k$.
+        }
+    }
+}
+
+\BlankLine
+\textbf{Convergence guarantee:} $\|\nabla f(x_\star)\| \leq \varepsilon_g$, $\;-\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H$.
+\end{algorithm}
+
+\subsection{Complexity Analysis}
+
+\subsubsection{NCG Phase}
+
+If $\|g_k\| \geq \varepsilon_g$, the algorithm conducts NCG. Following Theorem~3.1 of~\cite{RoyerChan2022}, the number of NCG iterations is at most
+\[
+K_{\text{NCG}} \leq \left\lfloor \frac{f(x_0) - f_{\text{low}}}{c_{\mathcal{R}}}\, \varepsilon_g^{-2} + \frac{f(x_0) - f_{\text{low}}}{c_{\mathcal{N}}}\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} \right\rfloor.
+\]
+
+Without line search, using a fixed stepsize with knowledge of $L_1$, the constants are:
+\[
+c_{\mathcal{R}} = \frac{1}{2L_1}, \qquad c_{\mathcal{N}} = \frac{\sigma^2}{2L_1\kappa^2}.
+\]
+This gives:
+\begin{equation}
+    K_{\text{NCG}} \leq \left\lfloor 2L_1\left(f(x_0) - f_{\text{low}}\right)\, \varepsilon_g^{-2} + \frac{2L_1\kappa^2}{\sigma^2}\left(f(x_0) - f_{\text{low}}\right)\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} \right\rfloor.
+\end{equation}
+
+\subsubsection{Negative Curvature Phase (same proof as in Wright and Ma, maybe not relevant to completely rewrite it, I could simply give the result)}
+
+If $\|g_k\| < \varepsilon_g$ and $-\lambda_k \geq \varepsilon_H$, the algorithm takes a negative curvature step:
+\[
+x_{k+1} = x_k + \frac{2\lambda_k}{L_2}\, e_k,
+\]
+where $e_k$ is the eigenvector associated with the smallest eigenvalue $\lambda_k$ of $\nabla^2 f(x_k)$, with sign chosen such that $\langle \nabla f(x_k), e_k \rangle \leq 0$.
+
+Since $\nabla^2 f$ is $L_2$-Lipschitz, a third-order Taylor expansion gives
+\[
+f(x_{k+1}) \leq f(x_k) + \langle \nabla f(x_k), x_{k+1} - x_k \rangle + \frac{1}{2} \langle \nabla^2 f(x_k)(x_{k+1} - x_k), x_{k+1} - x_k \rangle + \frac{L_2}{6} \|x_{k+1} - x_k\|^3.
+\]
+Since $e_k$ is a unit eigenvector of $\nabla^2 f(x_k)$ with eigenvalue $\lambda_k$, we have
+\[
+\nabla^2 f(x_k)(x_{k+1} - x_k) = \frac{2\lambda_k}{L_2}\, \nabla^2 f(x_k)\, e_k = \frac{2\lambda_k^2}{L_2}\, e_k.
+\]
+Moreover, $\langle \nabla f(x_k), e_k \rangle \leq 0$ and $\lambda_k < 0$, so $\langle \nabla f(x_k), x_{k+1} - x_k \rangle = \frac{2\lambda_k}{L_2} \langle \nabla f(x_k), e_k \rangle \geq 0$. Dropping this nonnegative term, we obtain
+\begin{align*}
+f(x_{k+1}) &\leq f(x_k) + \frac{1}{2} \cdot \frac{2\lambda_k^2}{L_2} \cdot \frac{2\lambda_k}{L_2} + \frac{L_2}{6} \left(\frac{2|\lambda_k|}{L_2}\right)^3 \\
+&= f(x_k) + \frac{2\lambda_k^3}{L_2^2} + \frac{8|\lambda_k|^3}{6L_2^2} \\
+&= f(x_k) - \frac{2|\lambda_k|^3}{L_2^2} + \frac{4|\lambda_k|^3}{3L_2^2} \\
+&= f(x_k) - \frac{2|\lambda_k|^3}{3L_2^2}.
+\end{align*}
+Since $-\lambda_k \geq \varepsilon_H$, this gives
+\[
+f(x_k) - f(x_{k+1}) \geq \frac{2\varepsilon_H^3}{3L_2^2}.
+\]
+Telescoping and using $f(x_k) \geq f_{\text{low}}$ for all $k$, the number of negative curvature steps is at most
+\begin{equation}
+    K_H \leq \frac{(f(x_0) - f_{\text{low}})\, 3L_2^2}{2\varepsilon_H^3}.    
+\end{equation}
+
+
+\subsubsection{Combined Bound}
+
+Every iteration is either an NCG step or an NCD step, and both draw from the same function decrease budget $\Delta f = f(x_0) - f_{\text{low}}$.
+\[
+K_{\text{NCG}} + K_H \leq 2L_1 \Delta f\, \varepsilon_g^{-2} + \frac{2L_1\kappa^2}{\sigma^2} \Delta f\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} + \frac{3L_2^2\, \Delta f}{2\varepsilon_H^3},
+\]
+giving an overall complexity of
+\begin{equation}
+    K = O\!\left(\varepsilon_g^{-2} + \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} + \varepsilon_H^{-3}\right).
+\end{equation}
+
+\section{Complexity Analysis For a Strict Saddle Non Convex Function, Without Line Search}
+
+We consider the same setting as in Section~\ref{sec:complex_arbitrary_lip} with the only difference being that the function of interest follows the strict saddle property.
+
+\begin{definition} \cite{GeSaddle15}
+We say a function $f(\cdot)$ is $(\alpha, \beta, \gamma, \delta)$-strict saddle if, for any $x$, at least one of the following holds:
+\begin{enumerate}
+    \item $\|\nabla f(x)\| \geq \alpha$,
+    \item $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$,
+    \item There exists a local minimizer $x^\star$ such that $\|x - x^\star\| \leq \delta$, and $f(\cdot)$ restricted to the $2\delta$-neighborhood of $x^\star$ (i.e., $\{x' : \|x' - x^\star\| \leq 2\delta\}$) is $\gamma$-strongly convex.
+\end{enumerate}
+\end{definition}
+
+\subsection{Complexity Analysis}
+The strict saddle property partitions the analysis in 3 regimes:
+\begin{itemize}
+    \item \textbf{Regime 1}: High gradient. In this case, we apply the standard NCG algorithm considered in~\cite{RoyerChan2022}. We get the same complexity (up to constants):
+    \begin{equation}
+        K = O(\alpha^{-2} + \alpha^{-\max\{1+p, 2(1 + p - q)\}})
+    \end{equation}
+    \item \textbf{Regime 2}: Negative Curvature. In this case, we apply the standard NCD algroithm considered in~\cite{WrightMa2022}. We get the same complexity:
+    \begin{equation}
+        K = O(\beta^{-3})
+    \end{equation}
+    \item \textbf{Regime 3}: Local strong convexity. This case is where there is innovation. My proof attempt is following.
+\end{itemize}
+
+\subsection{Proof Complexity Regime 3}
+\label{subsec:regime_3_SS}
+
+Locally, $f(x_k)$ is $\gamma$-strongly convex: $\nabla^2 f(x_k) \succeq \gamma I$ with $\gamma > 0$. This gives:
+\[
+\|\nabla f(x_k)\|^2 \geq 2\gamma(f(x_k) - f_{\text{low}}), \qquad \lambda_{\min}(\nabla^2 f(x_k)) \geq \gamma.
+\]
+
+We partition iterations as in~\cite{RoyerChan2022}:
+\[
+\mathcal{N} = \{k \in \mathbb{N} \mid g_k^T d_k \leq -\sigma\|g_k\|^{1+p} \text{ and } \|d_k\| \leq \kappa\|g_k\|^q\}, \qquad \mathcal{R} = \mathbb{N} \setminus \mathcal{N}.
+\]
+
+\subsubsection{Non-restarted iterations ($k \in \mathcal{N}$)}
+
+Without line search, the descent lemma gives:
+\[
+f(x_k + \alpha_k d_k) \leq f(x_k) + \alpha g_k^T d_k + \frac{L_1}{2}\alpha^2 \|d_k\|^2.
+\]
+Substituting condition~(\ref{eq:restart}) in the non-restarted case ($g_k^T d_k \leq -\sigma\|g_k\|^{1+p}$ and $\|d_k\| \leq \kappa\|g_k\|^q$):
+\[
+f(x_{k+1}) \leq f(x_k) - \alpha\sigma\|g_k\|^{1+p} + \frac{L_1}{2}\alpha^2\kappa^2\|g_k\|^{2q}.
+\]
+Setting the derivative with respect to $\alpha$ to zero:
+\[
+-\sigma\|g_k\|^{1+p} + L_1\alpha\kappa^2\|g_k\|^{2q} = 0 \implies \alpha = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}.
+\]
+Plugging back:
+\begin{align*}
+f(x_{k+1}) &\leq f(x_k) - \frac{\sigma^2}{L_1\kappa^2}\|g_k\|^{2(1+p-q)} + \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)} \\
+&= f(x_k) - \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)}.
+\end{align*}
+Thus:
+\[
+f(x_k) - f(x_{k+1}) \geq \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)}.
+\]
+Applying strong convexity ($\|g_k\|^2 \geq 2\gamma(f(x_k) - f_{\text{low}})$):
+\[
+f(x_k) - f(x_{k+1}) \geq \frac{\sigma^2}{2L_1\kappa^2}\left(2\gamma(f(x_k) - f_{\text{low}})\right)^{1+p-q}.
+\]
+
+Let $r := 1+p-q$. We now consider three cases.
+
+\paragraph{Case 1: $r = 1$ (i.e., $p = q$).}
+We get the same rate as the restarted case (i.e., gradient descent), up to constants:
+\[
+K_{\mathcal{N}, p=q} = O\!\left(\frac{L_1\kappa^2}{\sigma^2\gamma}\log\frac{1}{\varepsilon}\right).
+\]
+
+\paragraph{Case 2: $r > 1$ (i.e., $p > q$).}
+Let $C := \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$ and $r = 1+p-q > 1$. We have:
+\begin{align*}
+f(x_{k+1}) - f_{\text{low}} &\leq (f(x_k) - f_{\text{low}}) - C(f(x_k) - f_{\text{low}})^r \\
+&= (f(x_k) - f_{\text{low}})\left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right).
+\end{align*}
+Since $r - 1 > 0$, as $f(x_k) - f_{\text{low}} \to 0$, the term $C(f(x_k) - f_{\text{low}})^{r-1} \to 0$, so the contraction factor approaches 1. This yields a sublinear rate.
+
+Define $\phi_k := (f(x_k) - f_{\text{low}})^{(1-r)}$. Raising both sides to the power $(1-r) < 0$ flips the inequality:
+\[
+(f(x_{k+1}) - f_{\text{low}})^{1-r} \geq (f(x_k) - f_{\text{low}})^{1-r} \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r},
+\]
+that is,
+\[
+\phi_{k+1} \geq \phi_k \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r}.
+\]
+We use the inequality $(1-x)^{1-r} \geq 1 - (1-r)x$ for $x \in (0,1)$:
+\begin{align*}
+\phi_{k+1} &\geq \phi_k \left(1 - (1-r)C(f(x_k) - f_{\text{low}})^{r-1}\right) \\
+&= \phi_k \left(1 - (1-r)C\, \phi_k^{-1}\right) \\
+&= \phi_k - (1-r)C.
+\end{align*}
+Since $1 - r < 0$, we have $-(1-r) = r - 1 > 0$, so this reads $\phi_{k+1} \geq \phi_k + (r-1)C$.
+
+Telescoping:
+\[
+\phi_K \geq \phi_0 + K(r-1)C.
+\]
+That is,
+\[
+(f(x_K) - f_{\text{low}})^{1-r} \geq (f(x_0) - f_{\text{low}})^{1-r} + K(r-1)C.
+\]
+Since $1 - r < 0$, we have $(f(x_K) - f_{\text{low}})^{1-r} \to \infty$ as $f(x_K) - f_{\text{low}} \to 0$.
+Requiring $f(x_K) - f_{\text{low}} \leq \varepsilon$ gives $(f(x_K) - f_{\text{low}})^{1-r} \geq \varepsilon^{1-r}$, so we need:
+\[
+(f(x_0) - f_{\text{low}})^{1-r} + K(r-1)C \geq \varepsilon^{1-r},
+\]
+Recalling that $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$, we obtain:
+\begin{equation}
+K \geq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(r-1)}\left(\varepsilon^{1-r} - (f(x_0) - f_{\text{low}})^{1-r}\right).
+\end{equation}
+For small $\varepsilon$, the first term dominates, giving:
+\[
+K_{\mathcal{N},\, p > q} = O\!\left(\frac{1}{\gamma^{1+p-q}}\,\varepsilon^{q-p}\right).
+\]
+
+\paragraph{Case 3: $r < 1$ (i.e., $p < q$).}
+Same setup with $C := \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$ and $r = 1+p-q < 1$. We have:
+\[
+f(x_{k+1}) - f_{\text{low}} \leq (f(x_k) - f_{\text{low}})\left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right).
+\]
+Since $r - 1 < 0$, as $f(x_k) - f_{\text{low}} \to 0$, the term $C(f(x_k) - f_{\text{low}})^{r-1} \to \infty$, so the contraction factor improves at each iteration. This yields superlinear convergence.
+
+Define $\phi_k := (f(x_k) - f_{\text{low}})^{1-r}$, where $1 - r > 0$. Raising both sides to the power $1 - r > 0$ preserves the inequality:
+\[
+(f(x_{k+1}) - f_{\text{low}})^{1-r} \leq (f(x_k) - f_{\text{low}})^{1-r} \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r},
+\]
+that is,
+\[
+\phi_{k+1} \leq \phi_k \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r}.
+\]
+We use the inequality $(1-x)^{a} \leq 1 - ax$ for $x \in (0,1)$ and $a \in (0,1)$, with $a = 1-r \in (0,1)$:
+\begin{align*}
+\phi_{k+1} &\leq \phi_k \left(1 - (1-r)C(f(x_k) - f_{\text{low}})^{r-1}\right) \\
+&= \phi_k \left(1 - (1-r)C\, \phi_k^{-1}\right) \\
+&= \phi_k - (1-r)C.
+\end{align*}
+Note that $(f(x_k) - f_{\text{low}})^{r-1} = \phi_k^{-1}$ since $(r-1) = -(1-r)$.
+
+Telescoping over $K$ iterations:
+\[
+\phi_K \leq \phi_0 - K(1-r)C.
+\]
+Since $\phi_K = (f(x_K) - f_{\text{low}})^{1-r} \geq 0$ (a nonnegative quantity raised to a positive power), we must have:
+\[
+\phi_0 - K(1-r)C \geq 0 \implies K \leq \frac{\phi_0}{(1-r)C} = \frac{(f(x_0) - f_{\text{low}})^{1-r}}{(1-r)C}.
+\]
+At $K^\star = \left\lfloor \frac{(f(x_0) - f_{\text{low}})^{1-r}}{(1-r)C} \right\rfloor$, the recursion would require $\phi_{K^\star} \leq 0$. Since $\phi_{K^\star} \geq 0$, the only possibility is $\phi_{K^\star} = 0$, which implies $f(x_{K^\star}) = f_{\text{low}}$. The algorithm reaches the exact minimum in finitely many steps, with no dependence on a target accuracy $\varepsilon$.
+
+Substituting $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$:
+\begin{equation}
+K^\star_{\mathcal{N},\, p < q} \leq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(1-r)}\,(f(x_0) - f_{\text{low}})^{1-r} = O\!\left(\frac{1}{\gamma^{1+p-q}}\,(f(x_0) - f_{\text{low}})^{q-p}\right).
+\end{equation}
+
+\subsubsection{Restarted iterations ($k \in \mathcal{R}$)}
+
+For restarted iterations, $d_k = -g_k$, corresponding to $\sigma = \kappa = 1$ and $p = q = 1$:
+\[
+f(x_k) - f(x_{k+1}) \geq \frac{1}{2L_1}\|g_k\|^2 \geq \frac{\gamma}{L_1}(f(x_k) - f_{\text{low}}).
+\]
+Rearranging:
+\[
+f(x_{k+1}) - f_{\text{low}} \leq \left(1 - \frac{\gamma}{L_1}\right)(f(x_k) - f_{\text{low}}).
+\]
+Iterating $K$ times:
+\[
+f(x_K) - f_{\text{low}} \leq \left(1 - \frac{\gamma}{L_1}\right)^K (f(x_0) - f_{\text{low}}).
+\]
+Requiring $f(x_K) - f_{\text{low}} \leq \varepsilon$:
+\[
+\left(1 - \frac{\gamma}{L_1}\right)^K (f(x_0) - f_{\text{low}}) \leq \varepsilon.
+\]
+Taking logarithms on both sides:
+\[
+K \log\left(1 - \frac{\gamma}{L_1}\right) \leq \log\frac{\varepsilon}{f(x_0) - f_{\text{low}}}.
+\]
+Since $1 - \frac{\gamma}{L_1} < 1$, we have $\log\left(1 - \frac{\gamma}{L_1}\right) < 0$. Dividing by this negative quantity flips the inequality:
+\[
+K \geq \frac{\log\left(\frac{\varepsilon}{f(x_0) - f_{\text{low}}}\right)}{\log\left(1 - \frac{\gamma}{L_1}\right)} = \frac{\log\left(\frac{f(x_0) - f_{\text{low}}}{\varepsilon}\right)}{-\log\left(1 - \frac{\gamma}{L_1}\right)}.
+\]
+Using the inequality $-\log(1 - x) \geq x$ for $x \in (0,1)$, we have $-\log\left(1 - \frac{\gamma}{L_1}\right) \geq \frac{\gamma}{L_1}$, so:
+\[
+K \geq \frac{L_1}{\gamma}\log\left(\frac{f(x_0) - f_{\text{low}}}{\varepsilon}\right).
+\]
+Therefore:
+\begin{equation}
+K_{\mathcal{R}} = O\!\left(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right).
+\end{equation}
+
+\subsection{Overall Complexity Bound for Strict Saddle Functions}
+
+Combining the three regimes, the total number of iterations to reach an $\varepsilon$-approximate second-order stationary point (which, under the strict saddle property with $\varepsilon_g \leq \alpha$ and $\varepsilon_H \leq \beta$, is guaranteed to be near a local minimizer) is:
+\[
+K = K_{\text{Regime 1}} + K_{\text{Regime 2}} + K_{\text{Regime 3}}.
+\]
+
+From Regime 1 (NCG phase, $\|\nabla f(x)\| \geq \alpha$):
+\[
+K_{\text{Regime 1}} = O\!\left(\alpha^{-2} + \alpha^{-\max\{1+p,\, 2(1+p-q)\}}\right).
+\]
+
+From Regime 2 (NCD phase, $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$):
+\[
+K_{\text{Regime 2}} = O\!\left(\beta^{-3}\right).
+\]
+
+From Regime 3 (local strong convexity), with $r = 1+p-q$:
+\[
+K_{\text{Regime 3}} = O\!\left(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right) + 
+\begin{cases}
+O\!\left(\dfrac{L_1\kappa^2}{\sigma^2\gamma}\log\dfrac{1}{\varepsilon}\right) & \text{if } r = 1, \\[10pt]
+O\!\left(\dfrac{1}{\gamma^r}\,\varepsilon^{q-p}\right) & \text{if } r > 1, \\[10pt]
+O\!\left(\dfrac{1}{\gamma^r}\,(f(x_0) - f_{\text{low}})^{q-p}\right) & \text{if } r < 1.
+\end{cases}
+\]
+
+Therefore, the total complexity is:
+\begin{equation}
+K = O\!\left(\alpha^{-2} + \alpha^{-\max\{1+p,\, 2(1+p-q)\}} + \beta^{-3} + \frac{L_1}{\gamma}\log\frac{1}{\varepsilon} + K_{\mathcal{N}}(r)\right),
+\end{equation}
+where $K_{\mathcal{N}}(r)$ denotes the non-restarted contribution from Regime~3 depending on the case.
+
+\paragraph{Comparison with gradient descent.} For the hybrid GD + NCD under strict saddle, the overall complexity is:
+\[
+K_{\text{GD}} = O\!\left(\alpha^{-2} + \beta^{-3} + \frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right).
+\]
+Our NCG-based method introduces two differences:
+\begin{enumerate}
+    \item In Regime 1, the additional term $O(\alpha^{-\max\{1+p,\, 2(1+p-q)\}})$ from non-restarted NCG iterations, which for $p \in (0,1)$ can be better than $O(\alpha^{-2})$.
+    \item In Regime 3, the non-restarted term $K_{\mathcal{N}}(r)$, which for $r < 1$ achieves finite termination which is strictly better than the $O(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon})$ rate of gradient descent.
+\end{enumerate}
+However, in both regimes, the restarted iterations contribute a term matching gradient descent. The overall complexity can only strictly improve over GD if the number of restarted iterations is negligible.
+
+\section{Do we stay in Regime 3 once we enter it ?}
+
+
+\bibliographystyle{plain}
+\bibliography{refs} 
+
+\end{document}
