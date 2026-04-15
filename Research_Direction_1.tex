@@ -2,14 +2,22 @@
 \usepackage{amsmath, amssymb, amsthm}
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage[margin=1in]{geometry}
-\newtheorem{definition}{Definition}
 
-\title{Hybrid Nonlinear Conjugate Gradient and Negative Curvature Descent}
-\author{}
-\date{}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
 
 \begin{document}
+
+\title{Hybrid Nonlinear Conjugate Gradient and Negative Curvature Descent \\ for Strict Saddle Functions: Complexity Analysis}
+\author{}
+\date{}
 \maketitle
+
+
+% -------------------- SUMMARY OF WHERE WE ARE, TO UPDATE AS I WORK ON NEW THINGS AND GET NEW RESULTS --------------------
 
 \section*{For Clément and I to see where we are, and where we are going}
 In this work, we revisit the Hybrid Gradient and Negative Curvature Descent from~\cite{WrightMa2022}
@@ -35,93 +43,85 @@ This setting gives us three regimes to analyze based on the strit saddle conditi
     \item \textbf{Regime 3}: Local strong convexity. This case is where we innovate. It further partitions the analysis into 3 cases:
         \begin{itemize}
         \item The power $1+p-q = 1$: This case gives us the same rate as the restarted case (i.e. Gradient Descent)
-        \item The power $1+p-q$ is different from one. This gives us new complexities shown in Section~\ref{subsec:regime_3_SS}.
+        \item The power $1+p-q$ is different from one. This gives us new complexities shown in Section~\ref{sec:strict_saddle}.
     \end{itemize}
 \end{itemize}
 
-The next step (starting monday April 13th) is to see if when we are in regime 3, we stay there. This would mean that on some occasions, with the right choice of 
-hyperparameters $p$ and $q$, we could get exact convergence to a minimizer.
+I was also able to prove that once we enter Regime~3, we stay on the strong convexity region ($B(x^\star, 2\delta)$) thereafter. I actually proved it twice with 2 different techniques
+(while trying to prove that entering R3 meant staying in R3), and each lead to condition on different parameters. The first proof, using descent lemma and strong convexity
+equations lead to a condition on the Lipschitz constant, with respect to the strog convexity constant. This is not very god since those are hard to control.
+The second proof leads to a condition on the $\delta$ parameter, with respect to $\sigma, \kappa, p, q$ and the smoothness constant, which is a bit better. 
 
-\section{Complexity Analysis for an Arbitrary Non Convex Function, Without Line Search}
-\label{sec:complex_arbitrary_lip}
+However, I was not able to prove that once we enter regime 3,
+we stay on regime 3 ($B(x^\star, \delta)$) thereafter, and I think it is impossible to prove (at least starting at iteration $k_0$, the first iteration at which we enter Regime~3).
+However, what I am currently working on 
 
-\subsection{Setting}
+% -------------------- SECTION 1 - SETTING + ASSUMPTIONS --------------------
 
-We consider
-\[
+\section{Setting and Assumptions}
+\label{sec:setting}
+
+We consider the unconstrained optimization problem
+\begin{equation}
+\label{eq:problem}
 \min_{x \in \mathbb{R}^n} f(x),
-\]
-where $f : \mathbb{R}^n \to \mathbb{R}$ is twice continuously differentiable, with $L_1$-Lipschitz gradient and $L_2$-Lipschitz Hessian. We write $g_k = \nabla f(x_k)$.
+\end{equation}
+where $f : \mathbb{R}^n \to \mathbb{R}$ is twice continuously differentiable. We write $g_k = \nabla f(x_k)$ for the gradient at iterate $x_k$.
 
-Given a target accuracy $\varepsilon > 0$, we seek an $\varepsilon$-approximate second-order stationary point:
-\[
-\|\nabla f(x_\star)\| \leq \varepsilon_g, \qquad -\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H.
-\]
+We make the following standing assumptions throughout.
 
-We define the following constants from the complexity analysis of Algorithm~1 in~\cite{RoyerChan2022}:
-\[
-c_{\mathcal{R}} := \eta \min\left\{1,\; \frac{2(1-\eta)\theta}{L_1}\right\}, \qquad
-c_{\mathcal{N}} := \eta\sigma \min\left\{1,\; \frac{2(1-\eta)\sigma\theta}{\kappa^2 L_1}\right\}.
-\]
+\begin{description}
+    \item[A1.] $\nabla f$ is $L_1$-Lipschitz continuous: $\|\nabla f(x) - \nabla f(y)\| \leq L_1 \|x - y\|$ for all $x, y \in \mathbb{R}^n$.
+    \item[A2.] $\nabla^2 f$ is $L_2$-Lipschitz continuous: $\|\nabla^2 f(x) - \nabla^2 f(y)\| \leq L_2 \|x - y\|$ for all $x, y \in \mathbb{R}^n$.
+    \item[A3.] $f$ is bounded below: there exists $f_{\text{low}} \in \mathbb{R}$ such that $f(x) \geq f_{\text{low}}$ for all $x \in \mathbb{R}^n$.
+\end{description}
 
-Let $\varepsilon_g$ and $\varepsilon_H$ be the thresholds used in Algorithm~\ref{algo:NCG_NCD_Lip} to determine when NCG or NCD are performed, respectively.
-From Lemma 3.1 of~\cite{RoyerChan2022}, non-restarted iterations satisfy:
-\[
-f(x_k) - f(x_{k+1}) > c_{\mathcal{N}} \min\left\{\|g_k\|^{1+p},\; \|g_k\|^{2(1+p-q)}\right\} \geq c_{\mathcal{N}} \min\left\{\varepsilon_g^{1+p},\; \varepsilon_g^{2(1+p-q)}\right\} = \varepsilon.
-\]
+We denote the initial gap to the minimum by $\Delta f := f(x_0) - f_{\text{low}}$.
 
-\textbf{Case 1:} If the minimum is $\varepsilon_g^{1+p}$:
-\[
-c_{\mathcal{N}} \varepsilon_g^{1+p} = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/(1+p)}.
-\]
+\subsection{Partition of iterations}
 
-\textbf{Case 2:} If the minimum is $\varepsilon_g^{2(1+p-q)}$:
-\[
-c_{\mathcal{N}} \varepsilon_g^{2(1+p-q)} = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/2(1+p-q)}.
-\]
-
-Since we do not know which case holds, the binding exponent is $\max\{1+p,\; 2(1+p-q)\}$, giving:
-\[
-\varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{N}}}\right)^{1/\max\{1+p,\; 2(1+p-q)\}}.
-\]
-
-From Lemma 3.2, restarted iterations satisfy:
-\[
-f(x_k) - f(x_{k+1}) > c_{\mathcal{R}} \|g_k\|^2 \geq c_{\mathcal{R}} \varepsilon_g^2.
-\]
-Setting this equal to $\varepsilon$:
-\[
-c_{\mathcal{R}} \varepsilon_g^2 = \varepsilon \implies \varepsilon_g = \left(\frac{\varepsilon}{c_{\mathcal{R}}}\right)^{1/2}.
-\]
-
-Since we need $\|g_k\| \geq \varepsilon_g$ to guarantee a per-iteration decrease of at least $\varepsilon$ regardless of the iteration type (restarted or not):
+Following~\cite{RoyerChan2022}, we partition the iterations into two disjoint sets based on the restart condition. Given parameters $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, we define:
 \begin{equation}
-    \boxed{\varepsilon_g = \max\left\{\left(\frac{\varepsilon}{c_{\mathcal{R}}}\right)^{1/2},\; \left(\frac{\varepsilon}{c_N}\right)^{1/\max\{1+p,\; 2(1+p-q)\}}\right\}.}
+\label{eq:partition}
+\mathcal{N} = \{k \in \mathbb{N} \mid g_k^T d_k \leq -\sigma\|g_k\|^{1+p} \text{ and } \|d_k\| \leq \kappa\|g_k\|^q\}, \qquad \mathcal{R} = \mathbb{N} \setminus \mathcal{N}.
+\end{equation}
+We call $k \in \mathcal{N}$ a \emph{non-restarted} iteration and $k \in \mathcal{R}$ a \emph{restarted} iteration (where $d_k$ is reset to $-g_k$).
+
+\subsection{Main inequalities}
+
+The following inequalities are used repeatedly. From A1 (descent lemma), for any $x$ and direction $d$:
+\begin{equation}
+\label{eq:descent_lemma}
+f(x + \alpha d) \leq f(x) + \alpha \nabla f(x)^T d + \frac{L_1}{2}\alpha^2\|d\|^2.
+\end{equation}
+From $L_1$-smoothness, for any $x$ in a neighborhood of a local minimizer $x^\star$:
+\begin{equation}
+\label{eq:smooth_upper}
+\|\nabla f(x)\|^2 \leq 2L_1(f(x) - f(x^\star)).
+\end{equation}
+If additionally $f$ is $\gamma$-strongly convex in that neighborhood (Polyak--\L{}ojasiewicz inequality):
+\begin{equation}
+\label{eq:PL}
+\|\nabla f(x)\|^2 \geq 2\gamma(f(x) - f(x^\star)).
 \end{equation}
 
-$\varepsilon_H$ from~\cite{WrightMa2022} is 
-\begin{equation}
-    \boxed{\varepsilon_H = \left(\frac{3}{2}L_2^2\varepsilon\right)^{\frac{1}{3}}}
-\end{equation}
+% -------------------- SECTION 2 - ALGO --------------------
 
-The restart condition is defined as:
+\section{Algorithm}
+\label{sec:algorithm}
+
+The restart condition is:
 \begin{equation}
 \label{eq:restart}
 g_{k+1}^T d_{k+1} \geq -\sigma\|g_{k+1}\|^{1+p} \quad \text{or} \quad \|d_{k+1}\| \geq \kappa\|g_{k+1}\|^q.
 \end{equation}
 
 \begin{algorithm}[H]
-\caption{Hybrid NCG + Negative Curvature Descent (Known $L_1$, $L_2$)}
-\label{algo:NCG_NCD_Lip}
-\KwIn{$x_0 \in \mathbb{R}^n$, $\eta \in (0,1)$, $\theta \in (0,1)$, $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, $\varepsilon > 0$.}
+\caption{Hybrid NCG + Negative Curvature Descent}
+\label{algo:hybrid}
+\KwIn{$x_0 \in \mathbb{R}^n$, $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, $\varepsilon_g > 0$, $\varepsilon_H > 0$.}
 
 \BlankLine
-\textbf{Setup:}
-\[
-\varepsilon_g = \max\left\{\left(\frac{\varepsilon}{c_R}\right)^{1/2},\; \left(\frac{\varepsilon}{c_N}\right)^{1/\max\{1+p,\, 2(1+p-q)\}}\right\}, \qquad
-\varepsilon_H = \left(\frac{3 L_2^2\, \varepsilon}{2}\right)^{1/3}.
-\]
-
 Set $g_0 = \nabla f(x_0)$, $d_0 = -g_0$.
 
 \BlankLine
@@ -132,10 +132,7 @@ Set $g_0 = \nabla f(x_0)$, $d_0 = -g_0$.
     \BlankLine
     \eIf{$\|g_k\| \geq \varepsilon_g$}{
         \tcc{NCG phase}
-        Compute $\alpha_k = \theta^{j_k}$ where $j_k$ is the smallest nonnegative integer such that
-        \begin{equation}
-            f(x_k + \alpha_k d_k) < f(x_k) + \eta\, \alpha_k\, g_k^T d_k.
-        \end{equation}
+        Compute stepsize $\alpha_k > 0$ (via line search or optimal fixed step).
         
         Set $x_{k+1} = x_k + \alpha_k d_k$ and $g_{k+1} = \nabla f(x_{k+1})$.
 
@@ -147,14 +144,13 @@ Set $g_0 = \nabla f(x_0)$, $d_0 = -g_0$.
             Restart: $d_{k+1} \leftarrow -g_{k+1}$.
         }
     }{
-        Compute the smallest eigenvalue $\lambda_k$ and eigenvector $e_k$ of $\nabla^2 f(x_k)$, choosing the sign such that $\langle g_k, e_k \rangle \leq 0$.
+        Compute smallest eigenvalue $\lambda_k$ and eigenvector $e_k$ of $\nabla^2 f(x_k)$, with sign chosen such that $\langle g_k, e_k \rangle \leq 0$.
 
         \BlankLine
         \eIf{$-\lambda_k \geq \varepsilon_H$}{
             \tcc{Negative curvature phase}
-            \[
-            x_{k+1} = x_k + \frac{2\lambda_k}{L_2}\, e_k.
-            \]
+            $x_{k+1} = x_k + \frac{2\lambda_k}{L_2}\, e_k$.
+            
             Reset $d_{k+1} = -\nabla f(x_{k+1})$.
         }{
             \textbf{Stop} and return $x_\star = x_k$.
@@ -166,309 +162,618 @@ Set $g_0 = \nabla f(x_0)$, $d_0 = -g_0$.
 \textbf{Convergence guarantee:} $\|\nabla f(x_\star)\| \leq \varepsilon_g$, $\;-\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H$.
 \end{algorithm}
 
-\subsection{Complexity Analysis}
-
-\subsubsection{NCG Phase}
-
-If $\|g_k\| \geq \varepsilon_g$, the algorithm conducts NCG. Following Theorem~3.1 of~\cite{RoyerChan2022}, the number of NCG iterations is at most
-\[
-K_{\text{NCG}} \leq \left\lfloor \frac{f(x_0) - f_{\text{low}}}{c_{\mathcal{R}}}\, \varepsilon_g^{-2} + \frac{f(x_0) - f_{\text{low}}}{c_{\mathcal{N}}}\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} \right\rfloor.
-\]
-
-Without line search, using a fixed stepsize with knowledge of $L_1$, the constants are:
-\[
+\paragraph{Stepsize.} Without line search, using the descent lemma~\eqref{eq:descent_lemma} and optimizing over $\alpha$, the optimal fixed stepsize for non-restarted iterations is:
+\begin{equation}
+\label{eq:stepsize}
+\alpha_k^\star = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q},
+\end{equation}
+while for restarted iterations ($d_k = -g_k$), the stepsize is $\alpha_k = 1/L_1$. Both choices require knowledge of $L_1$ but not a line search. The complexity constants are then:
+\begin{equation}
+\label{eq:constants}
 c_{\mathcal{R}} = \frac{1}{2L_1}, \qquad c_{\mathcal{N}} = \frac{\sigma^2}{2L_1\kappa^2}.
-\]
-This gives:
-\begin{equation}
-    K_{\text{NCG}} \leq \left\lfloor 2L_1\left(f(x_0) - f_{\text{low}}\right)\, \varepsilon_g^{-2} + \frac{2L_1\kappa^2}{\sigma^2}\left(f(x_0) - f_{\text{low}}\right)\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} \right\rfloor.
 \end{equation}
 
-\subsubsection{Negative Curvature Phase (same proof as in Wright and Ma, maybe not relevant to completely rewrite it, I could simply give the result)}
+% -------------------- SECTION 3 - DECREASE LEMMAS --------------------
 
-If $\|g_k\| < \varepsilon_g$ and $-\lambda_k \geq \varepsilon_H$, the algorithm takes a negative curvature step:
-\[
-x_{k+1} = x_k + \frac{2\lambda_k}{L_2}\, e_k,
-\]
-where $e_k$ is the eigenvector associated with the smallest eigenvalue $\lambda_k$ of $\nabla^2 f(x_k)$, with sign chosen such that $\langle \nabla f(x_k), e_k \rangle \leq 0$.
+\section{Per-Iteration Decrease Guarantees}
+\label{sec:decrease}
 
-Since $\nabla^2 f$ is $L_2$-Lipschitz, a third-order Taylor expansion gives
-\[
-f(x_{k+1}) \leq f(x_k) + \langle \nabla f(x_k), x_{k+1} - x_k \rangle + \frac{1}{2} \langle \nabla^2 f(x_k)(x_{k+1} - x_k), x_{k+1} - x_k \rangle + \frac{L_2}{6} \|x_{k+1} - x_k\|^3.
-\]
-Since $e_k$ is a unit eigenvector of $\nabla^2 f(x_k)$ with eigenvalue $\lambda_k$, we have
-\[
-\nabla^2 f(x_k)(x_{k+1} - x_k) = \frac{2\lambda_k}{L_2}\, \nabla^2 f(x_k)\, e_k = \frac{2\lambda_k^2}{L_2}\, e_k.
-\]
-Moreover, $\langle \nabla f(x_k), e_k \rangle \leq 0$ and $\lambda_k < 0$, so $\langle \nabla f(x_k), x_{k+1} - x_k \rangle = \frac{2\lambda_k}{L_2} \langle \nabla f(x_k), e_k \rangle \geq 0$. Dropping this nonnegative term, we obtain
-\begin{align*}
-f(x_{k+1}) &\leq f(x_k) + \frac{1}{2} \cdot \frac{2\lambda_k^2}{L_2} \cdot \frac{2\lambda_k}{L_2} + \frac{L_2}{6} \left(\frac{2|\lambda_k|}{L_2}\right)^3 \\
-&= f(x_k) + \frac{2\lambda_k^3}{L_2^2} + \frac{8|\lambda_k|^3}{6L_2^2} \\
-&= f(x_k) - \frac{2|\lambda_k|^3}{L_2^2} + \frac{4|\lambda_k|^3}{3L_2^2} \\
-&= f(x_k) - \frac{2|\lambda_k|^3}{3L_2^2}.
-\end{align*}
-Since $-\lambda_k \geq \varepsilon_H$, this gives
-\[
-f(x_k) - f(x_{k+1}) \geq \frac{2\varepsilon_H^3}{3L_2^2}.
-\]
-Telescoping and using $f(x_k) \geq f_{\text{low}}$ for all $k$, the number of negative curvature steps is at most
+We establish decrease bounds for each type of iteration.
+
+\subsection{NCG phase: non-restarted iterations ($k \in \mathcal{N}$)}
+
+\begin{lemma}
+\label{lem:decrease_N}
+Let A1 hold and $k \in \mathcal{N}$ with $\|g_k\| > 0$. Then:
 \begin{equation}
-    K_H \leq \frac{(f(x_0) - f_{\text{low}})\, 3L_2^2}{2\varepsilon_H^3}.    
+\label{eq:decrease_N}
+f(x_k) - f(x_{k+1}) \geq c_{\mathcal{N}}\, \|g_k\|^{2(1+p-q)}.
 \end{equation}
-
-
-\subsubsection{Combined Bound}
-
-Every iteration is either an NCG step or an NCD step, and both draw from the same function decrease budget $\Delta f = f(x_0) - f_{\text{low}}$.
-\[
-K_{\text{NCG}} + K_H \leq 2L_1 \Delta f\, \varepsilon_g^{-2} + \frac{2L_1\kappa^2}{\sigma^2} \Delta f\, \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} + \frac{3L_2^2\, \Delta f}{2\varepsilon_H^3},
-\]
-giving an overall complexity of
-\begin{equation}
-    K = O\!\left(\varepsilon_g^{-2} + \varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} + \varepsilon_H^{-3}\right).
-\end{equation}
-
-\section{Complexity Analysis For a Strict Saddle Non Convex Function, Without Line Search}
-
-We consider the same setting as in Section~\ref{sec:complex_arbitrary_lip} with the only difference being that the function of interest follows the strict saddle property.
-
-\begin{definition} \cite{GeSaddle15}
-We say a function $f(\cdot)$ is $(\alpha, \beta, \gamma, \delta)$-strict saddle if, for any $x$, at least one of the following holds:
-\begin{enumerate}
-    \item $\|\nabla f(x)\| \geq \alpha$,
-    \item $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$,
-    \item There exists a local minimizer $x^\star$ such that $\|x - x^\star\| \leq \delta$, and $f(\cdot)$ restricted to the $2\delta$-neighborhood of $x^\star$ (i.e., $\{x' : \|x' - x^\star\| \leq 2\delta\}$) is $\gamma$-strongly convex.
-\end{enumerate}
-\end{definition}
-
-\subsection{Complexity Analysis}
-The strict saddle property partitions the analysis in 3 regimes:
-\begin{itemize}
-    \item \textbf{Regime 1}: High gradient. In this case, we apply the standard NCG algorithm considered in~\cite{RoyerChan2022}. We get the same complexity (up to constants):
-    \begin{equation}
-        K = O(\alpha^{-2} + \alpha^{-\max\{1+p, 2(1 + p - q)\}})
-    \end{equation}
-    \item \textbf{Regime 2}: Negative Curvature. In this case, we apply the standard NCD algroithm considered in~\cite{WrightMa2022}. We get the same complexity:
-    \begin{equation}
-        K = O(\beta^{-3})
-    \end{equation}
-    \item \textbf{Regime 3}: Local strong convexity. This case is where there is innovation. My proof attempt is following.
-\end{itemize}
-
-\subsection{Proof Complexity Regime 3}
-\label{subsec:regime_3_SS}
-
-Locally, $f(x_k)$ is $\gamma$-strongly convex: $\nabla^2 f(x_k) \succeq \gamma I$ with $\gamma > 0$. This gives:
-\[
-\|\nabla f(x_k)\|^2 \geq 2\gamma(f(x_k) - f_{\text{low}}), \qquad \lambda_{\min}(\nabla^2 f(x_k)) \geq \gamma.
-\]
-
-We partition iterations as in~\cite{RoyerChan2022}:
-\[
-\mathcal{N} = \{k \in \mathbb{N} \mid g_k^T d_k \leq -\sigma\|g_k\|^{1+p} \text{ and } \|d_k\| \leq \kappa\|g_k\|^q\}, \qquad \mathcal{R} = \mathbb{N} \setminus \mathcal{N}.
-\]
-
-\subsubsection{Non-restarted iterations ($k \in \mathcal{N}$)}
-
-Without line search, the descent lemma gives:
-\[
-f(x_k + \alpha_k d_k) \leq f(x_k) + \alpha g_k^T d_k + \frac{L_1}{2}\alpha^2 \|d_k\|^2.
-\]
-Substituting condition~(\ref{eq:restart}) in the non-restarted case ($g_k^T d_k \leq -\sigma\|g_k\|^{1+p}$ and $\|d_k\| \leq \kappa\|g_k\|^q$):
+\end{lemma}
+\begin{proof}
+From the descent lemma~\eqref{eq:descent_lemma}, using $g_k^T d_k \leq -\sigma\|g_k\|^{1+p}$ and $\|d_k\| \leq \kappa\|g_k\|^q$:
 \[
 f(x_{k+1}) \leq f(x_k) - \alpha\sigma\|g_k\|^{1+p} + \frac{L_1}{2}\alpha^2\kappa^2\|g_k\|^{2q}.
 \]
-Setting the derivative with respect to $\alpha$ to zero:
-\[
--\sigma\|g_k\|^{1+p} + L_1\alpha\kappa^2\|g_k\|^{2q} = 0 \implies \alpha = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}.
-\]
-Plugging back:
+Setting the derivative with respect to $\alpha$ to zero gives $\alpha^\star = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$. Substituting:
 \begin{align*}
-f(x_{k+1}) &\leq f(x_k) - \frac{\sigma^2}{L_1\kappa^2}\|g_k\|^{2(1+p-q)} + \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)} \\
-&= f(x_k) - \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)}.
+f(x_{k+1}) &\leq f(x_k) - \frac{\sigma^2}{L_1\kappa^2}\|g_k\|^{2(1+p-q)} + \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)} = f(x_k) - \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)}. \qedhere
 \end{align*}
-Thus:
-\[
-f(x_k) - f(x_{k+1}) \geq \frac{\sigma^2}{2L_1\kappa^2}\|g_k\|^{2(1+p-q)}.
-\]
-Applying strong convexity ($\|g_k\|^2 \geq 2\gamma(f(x_k) - f_{\text{low}})$):
-\[
-f(x_k) - f(x_{k+1}) \geq \frac{\sigma^2}{2L_1\kappa^2}\left(2\gamma(f(x_k) - f_{\text{low}})\right)^{1+p-q}.
-\]
+\end{proof}
 
-Let $r := 1+p-q$. We now consider three cases.
+\subsection{NCG phase: restarted iterations ($k \in \mathcal{R}$)}
 
-\paragraph{Case 1: $r = 1$ (i.e., $p = q$).}
-We get the same rate as the restarted case (i.e., gradient descent), up to constants:
-\[
-K_{\mathcal{N}, p=q} = O\!\left(\frac{L_1\kappa^2}{\sigma^2\gamma}\log\frac{1}{\varepsilon}\right).
-\]
-
-\paragraph{Case 2: $r > 1$ (i.e., $p > q$).}
-Let $C := \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$ and $r = 1+p-q > 1$. We have:
-\begin{align*}
-f(x_{k+1}) - f_{\text{low}} &\leq (f(x_k) - f_{\text{low}}) - C(f(x_k) - f_{\text{low}})^r \\
-&= (f(x_k) - f_{\text{low}})\left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right).
-\end{align*}
-Since $r - 1 > 0$, as $f(x_k) - f_{\text{low}} \to 0$, the term $C(f(x_k) - f_{\text{low}})^{r-1} \to 0$, so the contraction factor approaches 1. This yields a sublinear rate.
-
-Define $\phi_k := (f(x_k) - f_{\text{low}})^{(1-r)}$. Raising both sides to the power $(1-r) < 0$ flips the inequality:
-\[
-(f(x_{k+1}) - f_{\text{low}})^{1-r} \geq (f(x_k) - f_{\text{low}})^{1-r} \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r},
-\]
-that is,
-\[
-\phi_{k+1} \geq \phi_k \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r}.
-\]
-We use the inequality $(1-x)^{1-r} \geq 1 - (1-r)x$ for $x \in (0,1)$:
-\begin{align*}
-\phi_{k+1} &\geq \phi_k \left(1 - (1-r)C(f(x_k) - f_{\text{low}})^{r-1}\right) \\
-&= \phi_k \left(1 - (1-r)C\, \phi_k^{-1}\right) \\
-&= \phi_k - (1-r)C.
-\end{align*}
-Since $1 - r < 0$, we have $-(1-r) = r - 1 > 0$, so this reads $\phi_{k+1} \geq \phi_k + (r-1)C$.
-
-Telescoping:
-\[
-\phi_K \geq \phi_0 + K(r-1)C.
-\]
-That is,
-\[
-(f(x_K) - f_{\text{low}})^{1-r} \geq (f(x_0) - f_{\text{low}})^{1-r} + K(r-1)C.
-\]
-Since $1 - r < 0$, we have $(f(x_K) - f_{\text{low}})^{1-r} \to \infty$ as $f(x_K) - f_{\text{low}} \to 0$.
-Requiring $f(x_K) - f_{\text{low}} \leq \varepsilon$ gives $(f(x_K) - f_{\text{low}})^{1-r} \geq \varepsilon^{1-r}$, so we need:
-\[
-(f(x_0) - f_{\text{low}})^{1-r} + K(r-1)C \geq \varepsilon^{1-r},
-\]
-Recalling that $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$, we obtain:
+\begin{lemma}
+\label{lem:decrease_R}
+Let A1 hold and $k \in \mathcal{R}$ with $\|g_k\| > 0$. Then:
 \begin{equation}
-K \geq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(r-1)}\left(\varepsilon^{1-r} - (f(x_0) - f_{\text{low}})^{1-r}\right).
+\label{eq:decrease_R}
+f(x_k) - f(x_{k+1}) \geq c_{\mathcal{R}}\, \|g_k\|^{2}.
 \end{equation}
-For small $\varepsilon$, the first term dominates, giving:
+\end{lemma}
+\begin{proof}
+For restarted iterations, $d_k = -g_k$, corresponding to $\sigma = \kappa = 1$ and $p = q = 1$ in Lemma~\ref{lem:decrease_N}. The stepsize $\alpha = 1/L_1$ gives:
 \[
-K_{\mathcal{N},\, p > q} = O\!\left(\frac{1}{\gamma^{1+p-q}}\,\varepsilon^{q-p}\right).
+f(x_{k+1}) \leq f(x_k) - \frac{1}{2L_1}\|g_k\|^2. \qedhere
 \]
+\end{proof}
 
-\paragraph{Case 3: $r < 1$ (i.e., $p < q$).}
-Same setup with $C := \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$ and $r = 1+p-q < 1$. We have:
-\[
-f(x_{k+1}) - f_{\text{low}} \leq (f(x_k) - f_{\text{low}})\left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right).
-\]
-Since $r - 1 < 0$, as $f(x_k) - f_{\text{low}} \to 0$, the term $C(f(x_k) - f_{\text{low}})^{r-1} \to \infty$, so the contraction factor improves at each iteration. This yields superlinear convergence.
+\subsection{Negative curvature phase}
 
-Define $\phi_k := (f(x_k) - f_{\text{low}})^{1-r}$, where $1 - r > 0$. Raising both sides to the power $1 - r > 0$ preserves the inequality:
-\[
-(f(x_{k+1}) - f_{\text{low}})^{1-r} \leq (f(x_k) - f_{\text{low}})^{1-r} \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r},
-\]
-that is,
-\[
-\phi_{k+1} \leq \phi_k \left(1 - C(f(x_k) - f_{\text{low}})^{r-1}\right)^{1-r}.
-\]
-We use the inequality $(1-x)^{a} \leq 1 - ax$ for $x \in (0,1)$ and $a \in (0,1)$, with $a = 1-r \in (0,1)$:
-\begin{align*}
-\phi_{k+1} &\leq \phi_k \left(1 - (1-r)C(f(x_k) - f_{\text{low}})^{r-1}\right) \\
-&= \phi_k \left(1 - (1-r)C\, \phi_k^{-1}\right) \\
-&= \phi_k - (1-r)C.
-\end{align*}
-Note that $(f(x_k) - f_{\text{low}})^{r-1} = \phi_k^{-1}$ since $(r-1) = -(1-r)$.
-
-Telescoping over $K$ iterations:
-\[
-\phi_K \leq \phi_0 - K(1-r)C.
-\]
-Since $\phi_K = (f(x_K) - f_{\text{low}})^{1-r} \geq 0$ (a nonnegative quantity raised to a positive power), we must have:
-\[
-\phi_0 - K(1-r)C \geq 0 \implies K \leq \frac{\phi_0}{(1-r)C} = \frac{(f(x_0) - f_{\text{low}})^{1-r}}{(1-r)C}.
-\]
-At $K^\star = \left\lfloor \frac{(f(x_0) - f_{\text{low}})^{1-r}}{(1-r)C} \right\rfloor$, the recursion would require $\phi_{K^\star} \leq 0$. Since $\phi_{K^\star} \geq 0$, the only possibility is $\phi_{K^\star} = 0$, which implies $f(x_{K^\star}) = f_{\text{low}}$. The algorithm reaches the exact minimum in finitely many steps, with no dependence on a target accuracy $\varepsilon$.
-
-Substituting $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$:
+\begin{lemma}
+\label{lem:decrease_NCD}
+Let A1--A2 hold and $-\lambda_k \geq \varepsilon_H > 0$. Then the step $x_{k+1} = x_k + \frac{2\lambda_k}{L_2}e_k$ satisfies:
 \begin{equation}
-K^\star_{\mathcal{N},\, p < q} \leq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(1-r)}\,(f(x_0) - f_{\text{low}})^{1-r} = O\!\left(\frac{1}{\gamma^{1+p-q}}\,(f(x_0) - f_{\text{low}})^{q-p}\right).
+\label{eq:decrease_NCD}
+f(x_k) - f(x_{k+1}) \geq \frac{2|\lambda_k|^3}{3L_2^2} \geq \frac{2\varepsilon_H^3}{3L_2^2}.
+\end{equation}
+\end{lemma}
+\begin{proof}
+Since $\nabla^2 f$ is $L_2$-Lipschitz, a third-order Taylor expansion gives:
+\[
+f(x_{k+1}) \leq f(x_k) + \langle g_k, x_{k+1} - x_k \rangle + \frac{1}{2}\langle \nabla^2 f(x_k)(x_{k+1} - x_k), x_{k+1} - x_k \rangle + \frac{L_2}{6}\|x_{k+1} - x_k\|^3.
+\]
+Since $e_k$ is a unit eigenvector with eigenvalue $\lambda_k$ and $\langle g_k, e_k \rangle \leq 0$, $\lambda_k < 0$, the first-order term $\frac{2\lambda_k}{L_2}\langle g_k, e_k\rangle \geq 0$. Dropping it:
+\begin{align*}
+f(x_{k+1}) &\leq f(x_k) + \frac{1}{2}\cdot\frac{2\lambda_k^2}{L_2}\cdot\frac{2\lambda_k}{L_2} + \frac{L_2}{6}\left(\frac{2|\lambda_k|}{L_2}\right)^3 = f(x_k) - \frac{2|\lambda_k|^3}{3L_2^2}. \qedhere
+\end{align*}
+\end{proof}
+
+\begin{remark}
+\label{rem:monotone}
+All three lemmas guarantee $f(x_{k+1}) < f(x_k)$. This monotone decrease property ensures iterates remain within sublevel sets of $f$.
+\end{remark}
+
+% -------------------- SECTION 4 - ARBITRARY NONCONVEX - WE MIGHT DELETE THIS LATER, IT WAS MORE OF AN EXAMPLE AND EXERCISE FOR ME --------------------
+
+\section{Complexity on Arbitrary Nonconvex Functions}
+\label{sec:arbitrary}
+
+We first analyze Algorithm~\ref{algo:hybrid} on a general nonconvex function satisfying A1--A3, without assuming the strict saddle property.
+
+\begin{theorem}
+\label{thm:arbitrary}
+Under A1--A3, Algorithm~\ref{algo:hybrid} reaches a point satisfying $\|\nabla f(x_\star)\| \leq \varepsilon_g$ and $-\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H$ in at most $K$ iterations, where:
+\begin{equation}
+\label{eq:bound_arbitrary}
+K \leq \frac{\Delta f}{c_{\mathcal{R}}}\,\varepsilon_g^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\varepsilon_g^{-\max\{1+p,\, 2(1+p-q)\}} + \frac{3L_2^2\,\Delta f}{2}\,\varepsilon_H^{-3}.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Let $K$ be the first index such that the stopping condition holds. Every iteration $k < K$ is either an NCG step ($\|g_k\| \geq \varepsilon_g$) or an NCD step ($\|g_k\| < \varepsilon_g$, $-\lambda_k \geq \varepsilon_H$). Among NCG iterations, each is either restarted or non-restarted.
+
+By Lemma~\ref{lem:decrease_R}, each restarted NCG iteration decreases $f$ by at least $c_{\mathcal{R}}\,\varepsilon_g^2$. By Lemma~\ref{lem:decrease_N}, each non-restarted NCG iteration decreases $f$ by at least $c_{\mathcal{N}}\,\varepsilon_g^{\max\{1+p,\, 2(1+p-q)\}}$. By Lemma~\ref{lem:decrease_NCD}, each NCD iteration decreases $f$ by at least $\frac{2\varepsilon_H^3}{3L_2^2}$.
+
+Telescoping and using A3:
+\[
+\Delta f \geq K^1_{\mathcal{R}} \cdot c_{\mathcal{R}}\,\varepsilon_g^2 + K^1_{\mathcal{N}} \cdot c_{\mathcal{N}}\,\varepsilon_g^{\max\{1+p,\, 2(1+p-q)\}} + K^2 \cdot \frac{2\varepsilon_H^3}{3L_2^2}.
+\]
+Since all terms are positive, each is individually bounded by $\Delta f$. Summing the resulting bounds on $K^1_{\mathcal{R}}$, $K^1_{\mathcal{N}}$, and $K^2$ gives~\eqref{eq:bound_arbitrary}.
+\end{proof}
+
+\begin{remark}
+The bound~\eqref{eq:bound_arbitrary} is conservative because each group uses the full budget $\Delta f$ independently. The NCG terms match those of Theorem~3.1 in~\cite{RoyerChan2022} (up to constants due to the absence of line search), while the NCD term follows from~\cite{WrightMa2022}.
+\end{remark}
+
+% -------------------- SECTION 5 - STRICT SADDLE FUNCTION - THE HEART OF THE ANALYSIS --------------------
+
+\section{Complexity on Strict Saddle Functions}
+\label{sec:strict_saddle}
+
+We now specialize to functions satisfying the strict saddle property, which provides additional structure near stationary points.
+
+\subsection{The strict saddle property}
+
+\begin{definition}[\cite{GeSaddle15}]
+\label{def:strict_saddle}
+A function $f$ is $(\zeta, \beta, \gamma, \delta)$-strict saddle if, for any $x \in \mathbb{R}^n$, at least one of the following holds:
+\begin{enumerate}
+    \item \textbf{(Large gradient)} $\|\nabla f(x)\| \geq \zeta$,
+    \item \textbf{(Negative curvature)} $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$,
+    \item \textbf{(Near a local minimizer)} There exists a local minimizer $x^\star$ with $\|x - x^\star\| \leq \delta$, and $f$ restricted to $\{x' : \|x' - x^\star\| \leq 2\delta\}$ is $\gamma$-strongly convex.
+\end{enumerate}
+\end{definition}
+
+Setting $\varepsilon_g \leq \zeta$ and $\varepsilon_H \leq \beta$ in Algorithm~\ref{algo:hybrid} ensures that upon termination, condition~(3) holds: the output is near a local minimizer. The three conditions define three regimes, which we analyze separately.
+
+\paragraph{Notation.} We partition the iteration indices $\{0, \ldots, K-1\}$ into five disjoint sets:
+\begin{center}
+\begin{tabular}{lll}
+$\mathcal{N}^1$: & non-restarted in Regime 1 & ($|\mathcal{N}^1| = K^1_{\mathcal{N}}$) \\
+$\mathcal{R}^1$: & restarted in Regime 1 & ($|\mathcal{R}^1| = K^1_{\mathcal{R}}$) \\
+$\mathcal{H}$: & negative curvature in Regime 2 & ($|\mathcal{H}| = K^2$) \\
+$\mathcal{N}^3$: & non-restarted in Regime 3 & ($|\mathcal{N}^3| = K^3_{\mathcal{N}}$) \\
+$\mathcal{R}^3$: & restarted in Regime 3 & ($|\mathcal{R}^3| = K^3_{\mathcal{R}}$)
+\end{tabular}
+\end{center}
+The total iteration count is $K = K^1_{\mathcal{N}} + K^1_{\mathcal{R}} + K^2 + K^3_{\mathcal{N}} + K^3_{\mathcal{R}}$.
+
+All iterations draw from the single decrease budget $\Delta f$:
+\begin{equation}
+\label{eq:budget}
+\begin{split}
+    \Delta f \geq{} &\sum_{k \in \mathcal{N}^1}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{R}^1}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{H}}(f(x_k) - f(x_{k+1})) \\
+    &+ \sum_{k \in \mathcal{N}^3}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{R}^3}(f(x_k) - f(x_{k+1})).
+\end{split}
+\end{equation}
+We define the \emph{decrease consumed} in each regime as the sum of per-iteration decreases over all iterations belonging to that regime:
+\[
+\Delta f^1 := \sum_{k \in \mathcal{N}^1 \cup \mathcal{R}^1}(f(x_k) - f(x_{k+1})), \qquad \Delta f^2 := \sum_{k \in \mathcal{H}}(f(x_k) - f(x_{k+1})), \qquad \Delta f^3 := \sum_{k \in \mathcal{N}^3 \cup \mathcal{R}^3}(f(x_k) - f(x_{k+1})),
+\]
+so that $\Delta f^1 + \Delta f^2 + \Delta f^3 \leq \Delta f$. Note that $\Delta f^j$ is not the suboptimality at entry to regime $j$, but the total amount of function decrease accumulated during all iterations spent in regime~$j$. In particular, since the algorithm may visit regimes in any order, the iterations within each regime need not be contiguous.
+
+For Regime~3, however, the monotone decrease property (Remark~\ref{rem:monotone}) together with the analysis in Section~\ref{subsec:regime3} guarantees that once the algorithm enters Regime~3 at some iteration $k_0$, it stays there. In this case, $\Delta f^3 = f(x_{k_0}) - f(x_K)$, where $K$ is the final iteration. Since $f(x_K) \geq f(x^\star)$:
+\[
+\Delta f^3 \leq f(x_{k_0}) - f(x^\star) \leq \frac{L_1}{2}\delta^2,
+\]
+where the last inequality follows from~\eqref{eq:entry_gap}. This trajectory-independent upper bound on $\Delta f^3$ is what allows $\delta$ to appear in the Regime~3 complexity bounds.
+
+\subsection{Regime 1: Large gradient ($\|g_k\| \geq \zeta$)}
+
+The per-iteration decrease bounds from Lemmas~\ref{lem:decrease_N} and~\ref{lem:decrease_R} give:
+\[
+K^1_{\mathcal{R}} \leq \frac{\Delta f^1}{c_{\mathcal{R}}\,\zeta^2}, \qquad K^1_{\mathcal{N}} \leq \frac{\Delta f^1}{c_{\mathcal{N}}\,\zeta^{\max\{1+p,\, 2(1+p-q)\}}}.
+\]
+Since $\Delta f^1 \leq \Delta f$:
+\begin{equation}
+\label{eq:regime1}
+K^1 = K^1_{\mathcal{R}} + K^1_{\mathcal{N}} \leq \frac{\Delta f}{c_{\mathcal{R}}}\,\zeta^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\zeta^{-\max\{1+p,\, 2(1+p-q)\}}.
 \end{equation}
 
-\subsubsection{Restarted iterations ($k \in \mathcal{R}$)}
+\subsection{Regime 2: Negative curvature ($\lambda_{\min}(\nabla^2 f(x_k)) \leq -\beta$)}
 
-For restarted iterations, $d_k = -g_k$, corresponding to $\sigma = \kappa = 1$ and $p = q = 1$:
+From Lemma~\ref{lem:decrease_NCD} and $\Delta f^2 \leq \Delta f$:
+\begin{equation}
+\label{eq:regime2}
+K^2 \leq \frac{3L_2^2\,\Delta f}{2\beta^3}.
+\end{equation}
+
+\subsection{Regime 3: Near a local minimizer}
+\label{subsec:regime3}
+
+This is where $\|x_k - x^\star\| \leq \delta$ and $f$ is $\gamma$-strongly convex in the $2\delta$-neighborhood. Both~\eqref{eq:smooth_upper} and~\eqref{eq:PL} hold. The parameter $\delta$ controls the initial suboptimality upon entering this regime.
+
+\subsubsection{Entry condition and the role of $\delta$}
+\label{subsubsec:entry}
+
+At the first iteration $k_0$ in Regime~3, the strict saddle property (Definition~\ref{def:strict_saddle}, condition 3) guarantees $\|x_{k_0} - x^\star\| \leq \delta$ for some local minimizer $x^\star$. We now derive bounds on the suboptimality gap $\Delta f^3 := f(x_{k_0}) - f(x^\star)$ and the gradient norm $\|g_{k_0}\|$ in terms of $\delta$.
+
+\paragraph{Upper bound on the suboptimality gap.} Since $\nabla f$ is $L_1$-Lipschitz (A1), the descent lemma~\eqref{eq:descent_lemma} gives, for any $x, y \in \mathbb{R}^n$:
 \[
-f(x_k) - f(x_{k+1}) \geq \frac{1}{2L_1}\|g_k\|^2 \geq \frac{\gamma}{L_1}(f(x_k) - f_{\text{low}}).
+f(y) \leq f(x) + \nabla f(x)^T(y - x) + \frac{L_1}{2}\|y - x\|^2.
 \]
-Rearranging:
+Setting $x = x^\star$ and $y = x_{k_0}$, and using $\nabla f(x^\star) = 0$ (since $x^\star$ is a local minimizer):
 \[
-f(x_{k+1}) - f_{\text{low}} \leq \left(1 - \frac{\gamma}{L_1}\right)(f(x_k) - f_{\text{low}}).
-\]
-Iterating $K$ times:
-\[
-f(x_K) - f_{\text{low}} \leq \left(1 - \frac{\gamma}{L_1}\right)^K (f(x_0) - f_{\text{low}}).
-\]
-Requiring $f(x_K) - f_{\text{low}} \leq \varepsilon$:
-\[
-\left(1 - \frac{\gamma}{L_1}\right)^K (f(x_0) - f_{\text{low}}) \leq \varepsilon.
-\]
-Taking logarithms on both sides:
-\[
-K \log\left(1 - \frac{\gamma}{L_1}\right) \leq \log\frac{\varepsilon}{f(x_0) - f_{\text{low}}}.
-\]
-Since $1 - \frac{\gamma}{L_1} < 1$, we have $\log\left(1 - \frac{\gamma}{L_1}\right) < 0$. Dividing by this negative quantity flips the inequality:
-\[
-K \geq \frac{\log\left(\frac{\varepsilon}{f(x_0) - f_{\text{low}}}\right)}{\log\left(1 - \frac{\gamma}{L_1}\right)} = \frac{\log\left(\frac{f(x_0) - f_{\text{low}}}{\varepsilon}\right)}{-\log\left(1 - \frac{\gamma}{L_1}\right)}.
-\]
-Using the inequality $-\log(1 - x) \geq x$ for $x \in (0,1)$, we have $-\log\left(1 - \frac{\gamma}{L_1}\right) \geq \frac{\gamma}{L_1}$, so:
-\[
-K \geq \frac{L_1}{\gamma}\log\left(\frac{f(x_0) - f_{\text{low}}}{\varepsilon}\right).
+f(x_{k_0}) \leq f(x^\star) + 0 + \frac{L_1}{2}\|x_{k_0} - x^\star\|^2 \leq f(x^\star) + \frac{L_1}{2}\delta^2.
 \]
 Therefore:
 \begin{equation}
-K_{\mathcal{R}} = O\!\left(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right).
+\label{eq:entry_upper}
+\Delta f^3 = f(x_{k_0}) - f(x^\star) \leq \frac{L_1}{2}\delta^2.
 \end{equation}
 
-\subsection{Overall Complexity Bound for Strict Saddle Functions}
-
-Combining the three regimes, the total number of iterations to reach an $\varepsilon$-approximate second-order stationary point (which, under the strict saddle property with $\varepsilon_g \leq \alpha$ and $\varepsilon_H \leq \beta$, is guaranteed to be near a local minimizer) is:
+\paragraph{Lower bound on the suboptimality gap.} Since $f$ is $\gamma$-strongly convex in $B(x^\star, 2\delta)$ and $x_{k_0} \in B(x^\star, \delta) \subset B(x^\star, 2\delta)$:
 \[
-K = K_{\text{Regime 1}} + K_{\text{Regime 2}} + K_{\text{Regime 3}}.
+f(x_{k_0}) \geq f(x^\star) + \nabla f(x^\star)^T(x_{k_0} - x^\star) + \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 = f(x^\star) + \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2,
 \]
+where we again used $\nabla f(x^\star) = 0$. Therefore:
+\begin{equation}
+\label{eq:entry_lower}
+\Delta f^3 = f(x_{k_0}) - f(x^\star) \geq \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2.
+\end{equation}
+Combining~\eqref{eq:entry_upper} and~\eqref{eq:entry_lower}:
+\begin{equation}
+\label{eq:entry_gap}
+\frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 \leq \Delta f^3 \leq \frac{L_1}{2}\delta^2.
+\end{equation}
 
-From Regime 1 (NCG phase, $\|\nabla f(x)\| \geq \alpha$):
+\paragraph{Upper bound on the gradient norm.} From the smoothness inequality~\eqref{eq:smooth_upper}, which states $\|\nabla f(x)\|^2 \leq 2L_1(f(x) - f(x^\star))$ 
+for any $x$ near $x^\star$, we have:
 \[
-K_{\text{Regime 1}} = O\!\left(\alpha^{-2} + \alpha^{-\max\{1+p,\, 2(1+p-q)\}}\right).
+\|g_{k_0}\|^2 \leq 2L_1(f(x_{k_0}) - f(x^\star)).
 \]
-
-From Regime 2 (NCD phase, $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$):
+Substituting the upper bound~\eqref{eq:entry_upper} on $\Delta f^3$:
 \[
-K_{\text{Regime 2}} = O\!\left(\beta^{-3}\right).
+\|g_{k_0}\|^2 \leq 2L_1 \cdot \frac{L_1}{2}\delta^2 = L_1^2\delta^2.
 \]
+Taking square roots:
+\begin{equation}
+\label{eq:entry_grad_upper}
+\|g_{k_0}\| \leq L_1\delta.
+\end{equation}
 
-From Regime 3 (local strong convexity), with $r = 1+p-q$:
+\paragraph{Lower bound on the gradient norm.} From the Polyak--\L{}ojasiewicz inequality~\eqref{eq:PL}, which states \\
+ $\|\nabla f(x)\|^2 \geq 2\gamma(f(x) - f(x^\star))$, 
+and the lower bound~\eqref{eq:entry_lower}:
 \[
-K_{\text{Regime 3}} = O\!\left(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right) + 
+\|g_{k_0}\|^2 \geq 2\gamma(f(x_{k_0}) - f(x^\star)) \geq 2\gamma \cdot \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 = \gamma^2\|x_{k_0} - x^\star\|^2.
+\]
+Taking square roots:
+\begin{equation}
+\label{eq:entry_grad_lower}
+\|g_{k_0}\| \geq \gamma\|x_{k_0} - x^\star\|.
+\end{equation}
+
+\subsubsection{Non-restarted iterations in Regime 3 ($k \in \mathcal{N}^3$)}
+
+Combining Lemma~\ref{lem:decrease_N} with the PL inequality~\eqref{eq:PL}:
+\begin{equation}
+\label{eq:decrease_N3}
+f(x_k) - f(x_{k+1}) \geq c_{\mathcal{N}}\left(2\gamma(f(x_k) - f(x^\star))\right)^r, \qquad r := 1 + p - q.
+\end{equation}
+Define $C := c_{\mathcal{N}}(2\gamma)^r = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$. We analyze three cases.
+
+\paragraph{Case 1: $r = 1$ ($p = q$).} The decrease becomes $f(x_k) - f(x_{k+1}) \geq 2\gamma\, c_{\mathcal{N}}(f(x_k) - f(x^\star))$, giving a linear rate identical (up to constants) to the restarted case. Using $\Delta f^3 \leq \frac{L_1}{2}\delta^2$:
+\begin{equation}
+\label{eq:N3_r1}
+K^3_{\mathcal{N},\, p=q} \leq \frac{L_1\kappa^2}{\sigma^2\gamma}\log\frac{L_1\delta^2}{2\varepsilon}.
+\end{equation}
+
+\paragraph{Case 2: $r > 1$ ($p > q$, sublinear rate).} We have:
+\[
+f(x_{k+1}) - f(x^\star) \leq (f(x_k) - f(x^\star))\left(1 - C(f(x_k) - f(x^\star))^{r-1}\right).
+\]
+Define $\phi_k := (f(x_k) - f(x^\star))^{1-r}$. Raising both sides to the power $1 - r < 0$ flips the inequality. Using $(1-x)^{1-r} \geq 1 + (r-1)x$ for $x \in (0,1)$:
+\begin{align*}
+\phi_{k+1} &\geq \phi_k(1 - (1-r)C\,\phi_k^{-1}) = \phi_k + (r-1)C.
+\end{align*}
+Telescoping over $K^3_{\mathcal{N}}$ iterations: $\phi_{K} \geq \phi_0 + K^3_{\mathcal{N}}(r-1)C$. Requiring $f(x_K) - f(x^\star) \leq \varepsilon$ and using $\Delta f^3 \leq \frac{L_1}{2}\delta^2$:
+\begin{equation}
+\label{eq:N3_r_big}
+K^3_{\mathcal{N},\, p>q} \leq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(r-1)}\left(\varepsilon^{1-r} - \left(\frac{L_1\delta^2}{2}\right)^{1-r}\right).
+\end{equation}
+
+\paragraph{Case 3: $r < 1$ ($p < q$, finite termination).} Same recursion, but now $1 - r > 0$, so the power preserves the inequality. Using $(1-x)^{1-r} \leq 1 - (1-r)x$ for $x \in (0,1)$ and $1-r \in (0,1)$:
+\begin{align*}
+\phi_{k+1} &\leq \phi_k(1 - (1-r)C\,\phi_k^{-1}) = \phi_k - (1-r)C.
+\end{align*}
+Telescoping: $\phi_K \leq \phi_0 - K^3_{\mathcal{N}}(1-r)C$. Since $\phi_K \geq 0$:
+\[
+K^3_{\mathcal{N}} \leq \frac{\phi_0}{(1-r)C} = \frac{(\Delta f^3)^{1-r}}{(1-r)C}.
+\]
+At $K^\star = \lfloor \frac{(\Delta f^3)^{1-r}}{(1-r)C} \rfloor$, the recursion forces $\phi_{K^\star} = 0$, i.e., $f(x_{K^\star}) = f(x^\star)$ exactly. Using $\Delta f^3 \leq \frac{L_1}{2}\delta^2$ from~\eqref{eq:entry_gap}:
+\begin{equation}
+\label{eq:N3_r_small}
+K^3_{\mathcal{N},\, p<q} \leq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(1-r)}\left(\frac{L_1\delta^2}{2}\right)^{1-r}.
+\end{equation}
+This bound is independent of $\varepsilon$: the algorithm reaches the exact minimizer in finitely many non-restarted steps.
+
+\subsubsection{Restarted iterations in Regime 3 ($k \in \mathcal{R}^3$)}
+
+From Lemma~\ref{lem:decrease_R} and the PL inequality:
+\[
+f(x_{k+1}) - f(x^\star) \leq \left(1 - \frac{\gamma}{L_1}\right)(f(x_k) - f(x^\star)).
+\]
+Iterating and requiring $f(x_K) - f(x^\star) \leq \varepsilon$, using $-\log(1-x) \geq x$ for $x \in (0,1)$:
+\begin{equation}
+\label{eq:R3}
+K^3_{\mathcal{R}} \leq \frac{L_1}{\gamma}\log\frac{L_1\delta^2}{2\varepsilon}.
+\end{equation}
+
+\subsection{Overall complexity}
+
+\begin{theorem}
+\label{thm:strict_saddle}
+Under A1--A3, suppose $f$ is $(\zeta, \beta, \gamma, \delta)$-strict saddle. Then Algorithm~\ref{algo:hybrid} with $\varepsilon_g = \zeta$ and $\varepsilon_H = \beta$ reaches a point near a local minimizer in at most $K$ iterations, where:
+\begin{equation}
+\label{eq:total}
+\boxed{
+K \leq \underbrace{\frac{\Delta f}{c_{\mathcal{R}}}\,\zeta^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\zeta^{-\max\{1+p,\, 2(1+p-q)\}}}_{\text{Regime 1}} + \underbrace{\frac{3L_2^2\,\Delta f}{2\beta^3}}_{\text{Regime 2}} + \underbrace{\frac{L_1}{\gamma}\log\frac{L_1\delta^2}{2\varepsilon} + K^3_{\mathcal{N}}(r)}_{\text{Regime 3}}
+}
+\end{equation}
+where $K^3_{\mathcal{N}}(r)$ depends on $r = 1+p-q$:
+\[
+K^3_{\mathcal{N}}(r) = 
 \begin{cases}
-O\!\left(\dfrac{L_1\kappa^2}{\sigma^2\gamma}\log\dfrac{1}{\varepsilon}\right) & \text{if } r = 1, \\[10pt]
-O\!\left(\dfrac{1}{\gamma^r}\,\varepsilon^{q-p}\right) & \text{if } r > 1, \\[10pt]
-O\!\left(\dfrac{1}{\gamma^r}\,(f(x_0) - f_{\text{low}})^{q-p}\right) & \text{if } r < 1.
+\dfrac{L_1\kappa^2}{\sigma^2\gamma}\log\dfrac{L_1\delta^2}{2\varepsilon} & \text{if } r = 1, \\[12pt]
+\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(r-1)}\left(\varepsilon^{1-r} - \left(\dfrac{L_1\delta^2}{2}\right)^{1-r}\right) & \text{if } r > 1, \\[12pt]
+\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(1-r)}\left(\dfrac{L_1\delta^2}{2}\right)^{1-r} & \text{if } r < 1.
 \end{cases}
 \]
+\end{theorem}
 
-Therefore, the total complexity is:
-\begin{equation}
-K = O\!\left(\alpha^{-2} + \alpha^{-\max\{1+p,\, 2(1+p-q)\}} + \beta^{-3} + \frac{L_1}{\gamma}\log\frac{1}{\varepsilon} + K_{\mathcal{N}}(r)\right),
-\end{equation}
-where $K_{\mathcal{N}}(r)$ denotes the non-restarted contribution from Regime~3 depending on the case.
+\begin{proof}
+Combine~\eqref{eq:regime1},~\eqref{eq:regime2}, and the Regime~3 bounds from Sections~\ref{subsec:regime3}. The bound is conservative because each regime 
+uses $\Delta f^j \leq \Delta f$ independently, whereas $\Delta f^1 + \Delta f^2 + \Delta f^3 \leq \Delta f$. If we knew all $\Delta f^j$ in advance, we could
+plug it in the bound to have something tighter.
+\end{proof}
 
-\paragraph{Comparison with gradient descent.} For the hybrid GD + NCD under strict saddle, the overall complexity is:
+The restarted terms ($\zeta^{-2}$ in Regime~1, $\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}$ in Regime~3) match GD. 
+The overall bound strictly improves over GD only when $K^1_{\mathcal{R}} + K^3_{\mathcal{R}} \ll K$. 
+
+% ------------------- Analysis of staying in REGIME 3 (ONGOING) -------------------
+
+\section{Regime 3 Analysis}
+
+\subsection{Staying in Strong-Convexity Region (proof 1 using strongly convex + descent lemma)}
+\label{subsubsec:staying}
+
+\begin{proposition}
+\label{prop:stay}
+Suppose $f$ is $\gamma$-strongly convex in $B(x^\star, 2\delta) := \{x : \|x - x^\star\| \leq 2\delta\}$ and A1 holds globally. Let $k_0$ be the first iteration at which $x_{k_0} \in B(x^\star, \delta)$. If $L_1 \leq 4\gamma$, then $x_k \in B(x^\star, 2\delta)$ for all $k \geq k_0$.
+\end{proposition}
+
+\begin{proof}
+We proceed by induction on $k \geq k_0$.
+
+\paragraph{Base case ($k = k_0$).} By assumption, $x_{k_0} \in B(x^\star, \delta)$. Since $\delta < 2\delta$, we have $x_{k_0} \in B(x^\star, 2\delta)$.
+
+\paragraph{Inductive step.} Assume $x_k \in B(x^\star, 2\delta)$ for some $k \geq k_0$. We want to show $x_{k+1} \in B(x^\star, 2\delta)$.
+
+\medskip
+\emph{Step 1: $f(x_{k+1}) \leq f(x_{k_0})$.} Since A1 holds globally, the descent lemma~\eqref{eq:descent_lemma} applies at every iterate, regardless of its location. As established in Lemmas~\ref{lem:decrease_N},~\ref{lem:decrease_R}, and~\ref{lem:decrease_NCD}, every iteration of Algorithm~\ref{algo:hybrid} (whether non-restarted, restarted, or negative curvature) produces strict decrease:
 \[
-K_{\text{GD}} = O\!\left(\alpha^{-2} + \beta^{-3} + \frac{L_1}{\gamma}\log\frac{1}{\varepsilon}\right).
+f(x_{k+1}) < f(x_k) \qquad \text{for all } k \geq 0.
 \]
-Our NCG-based method introduces two differences:
+Applying this repeatedly from $k_0$ to $k$:
+\[
+f(x_{k+1}) < f(x_k) < f(x_{k-1}) < \cdots < f(x_{k_0}).
+\]
+In particular:
+\begin{equation}
+\label{eq:chain}
+f(x_{k+1}) \leq f(x_{k_0}).
+\end{equation}
+
+\medskip
+\emph{Step 2: Upper bound on $f(x_{k_0})$.} From the entry condition (Section~\ref{subsubsec:entry}), since $x_{k_0} \in B(x^\star, \delta)$ and $\nabla f(x^\star) = 0$, the descent lemma with $x = x^\star$ and $y = x_{k_0}$ gives:
+\[
+f(x_{k_0}) \leq f(x^\star) + \frac{L_1}{2}\|x_{k_0} - x^\star\|^2 \leq f(x^\star) + \frac{L_1}{2}\delta^2.
+\]
+Combining with~\eqref{eq:chain}:
+\begin{equation}
+\label{eq:fk1_bound}
+f(x_{k+1}) \leq f(x^\star) + \frac{L_1}{2}\delta^2.
+\end{equation}
+
+\medskip
+\emph{Step 3: Lower bound on $f$ at the boundary of $B(x^\star, 2\delta)$.} Suppose for contradiction that $\|x_{k+1} - x^\star\| > 2\delta$, i.e., $x_{k+1} \notin B(x^\star, 2\delta)$. Consider any point $\bar{x}$ on the boundary of $B(x^\star, 2\delta)$, i.e., $\|\bar{x} - x^\star\| = 2\delta$. Since $f$ is $\gamma$-strongly convex in $B(x^\star, 2\delta)$ and $\nabla f(x^\star) = 0$:
+\[
+f(\bar{x}) \geq f(x^\star) + \nabla f(x^\star)^T(\bar{x} - x^\star) + \frac{\gamma}{2}\|\bar{x} - x^\star\|^2 = f(x^\star) + \frac{\gamma}{2}(2\delta)^2 = f(x^\star) + 2\gamma\delta^2.
+\]
+This means: to leave $B(x^\star, 2\delta)$, the function value must exceed $f(x^\star) + 2\gamma\delta^2$, since $f$ increases (by strong convexity) as we move away from $x^\star$. By continuity of $f$, if $x_{k+1}$ is outside $B(x^\star, 2\delta)$, there exists a point on the path from $x_k$ to $x_{k+1}$ where $f$ equals $f(x^\star) + 2\gamma\delta^2$. Since $f(x_{k+1}) < f(x_k)$ and $x_k \in B(x^\star, 2\delta)$ (inductive hypothesis), the iterate must cross the boundary, so:
+\begin{equation}
+\label{eq:boundary}
+f(x_{k+1}) \geq f(x^\star) + 2\gamma\delta^2.
+\end{equation}
+
+\medskip
+\emph{Step 4: Contradiction.} Combining~\eqref{eq:fk1_bound} and~\eqref{eq:boundary}:
+\[
+f(x^\star) + 2\gamma\delta^2 \leq f(x_{k+1}) \leq f(x^\star) + \frac{L_1}{2}\delta^2.
+\]
+Subtracting $f(x^\star)$ from all terms:
+\[
+2\gamma\delta^2 \leq \frac{L_1}{2}\delta^2.
+\]
+Dividing by $\delta^2 > 0$:
+\[
+2\gamma \leq \frac{L_1}{2} \iff 4\gamma \leq L_1.
+\]
+This contradicts the assumption $L_1 \leq 4\gamma$. Therefore $x_{k+1} \in B(x^\star, 2\delta)$, completing the inductive step.
+
+\end{proof}
+
+
+\subsection{Staying in Strong-Convexity Region (proof 2 using step length bound)}
+
+We provide an alternative proof that iterates remain in $B(x^\star, 2\delta)$, using control of the step length. 
+This approach replaces the condition $L_1 \leq 4\gamma$ with a condition on $\delta$.
+
+\begin{proposition}
+\label{prop:stay_step}
+Suppose $f$ is $\gamma$-strongly convex in $B(x^\star, 2\delta)$ and A1 holds globally. Let $k_0$ be the first iteration at which $x_{k_0} \in B(x^\star, \delta)$. Suppose one of the following holds:
 \begin{enumerate}
-    \item In Regime 1, the additional term $O(\alpha^{-\max\{1+p,\, 2(1+p-q)\}})$ from non-restarted NCG iterations, which for $p \in (0,1)$ can be better than $O(\alpha^{-2})$.
-    \item In Regime 3, the non-restarted term $K_{\mathcal{N}}(r)$, which for $r < 1$ achieves finite termination which is strictly better than the $O(\frac{L_1}{\gamma}\log\frac{1}{\varepsilon})$ rate of gradient descent.
+    \item $p = q$,
+    \item $p > q$ and $\delta \leq \left(\dfrac{\kappa}{\sigma}\right)^{1/(p-q)}\dfrac{1}{L_1}$,
+    \item $p < q$ and $\delta \geq \left(\dfrac{\sigma}{\kappa}\right)^{1/(q-p)}\dfrac{1}{L_1}$.
 \end{enumerate}
-However, in both regimes, the restarted iterations contribute a term matching gradient descent. The overall complexity can only strictly improve over GD if the number of restarted iterations is negligible.
+Then $x_k \in B(x^\star, 2\delta)$ for all $k \geq k_0$.
+\end{proposition}
 
-\section{Do we stay in Regime 3 once we enter it ?}
+\begin{proof}
+We proceed by induction on $k \geq k_0$. The base case $x_{k_0} \in B(x^\star, \delta) \subset B(x^\star, 2\delta)$ holds by assumption. Assume $x_k \in B(x^\star, 2\delta)$ for some $k \geq k_0$. We show $x_{k+1} \in B(x^\star, 2\delta)$ by bounding the step length for each iteration type.
 
+\subsubsection{Non-restarted case ($k \in \mathcal{N}$)}
+
+Recall that $x_{k+1} = x_k + \alpha_k d_k$, where $d_k = -g_k + \beta_k d_{k-1}$ (with $d_0 = -g_0$). Under non-restarted iterations, condition~\eqref{eq:restart} is not triggered, so:
+\[
+g_{k+1}^T d_{k+1} \leq -\sigma\|g_{k+1}\|^{1+p} \quad \text{and} \quad \|d_{k+1}\| \leq \kappa\|g_{k+1}\|^q.
+\]
+
+From the entry condition (Section~\ref{subsubsec:entry}), for all $k \geq k_0$ such that $x_k \in B(x^\star, \delta)$:
+\[
+\|g_k\| \leq L_1\delta.
+\]
+
+The step length satisfies:
+\[
+\|x_{k+1} - x_k\| = \alpha_k\|d_k\| \leq \alpha_k \kappa\|g_k\|^q.
+\]
+Substituting the optimal stepsize $\alpha_k^\star = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$:
+\begin{align*}
+\|x_{k+1} - x_k\| &\leq \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q} \cdot \kappa\|g_k\|^q \\
+&= \frac{\sigma}{L_1\kappa}\|g_k\|^{1+p-q}.
+\end{align*}
+Using $\|g_k\| \leq L_1\delta$:
+\begin{equation}
+\label{eq:step_NR}
+\|x_{k+1} - x_k\| \leq \frac{\sigma}{L_1\kappa}(L_1\delta)^{1+p-q} = \frac{\sigma}{\kappa}L_1^{p-q}\,\delta^{1+p-q}.
+\end{equation}
+
+We want $\|x_{k+1} - x_k\| \leq \delta$, i.e.:
+\[
+\frac{\sigma}{\kappa}L_1^{p-q}\,\delta^{1+p-q} \leq \delta \iff \frac{\sigma}{\kappa}(L_1\delta)^{p-q} \leq 1.
+\]
+
+Three cases arise depending on the sign of $p - q$:
+
+\paragraph{Case $p = q$:} The condition becomes $\frac{\sigma}{\kappa} \leq 1$, which always holds since $\sigma \leq 1 \leq \kappa$.
+
+\paragraph{Case $p > q$ ($p - q > 0$):} The condition becomes:
+\[
+(L_1\delta)^{p-q} \leq \frac{\kappa}{\sigma} \iff \delta \leq \left(\frac{\kappa}{\sigma}\right)^{1/(p-q)}\frac{1}{L_1}.
+\]
+This is a condition for $\delta$ small enough, which is satisfied for sufficiently small $\delta$.
+
+\paragraph{Case $p < q$ ($p - q < 0$):} Since $p - q < 0$, we have $(L_1\delta)^{p-q} = \frac{1}{(L_1\delta)^{q-p}} \to \infty$ as $\delta \to 0$. The condition becomes:
+\[
+(L_1\delta)^{p-q} \leq \frac{\kappa}{\sigma} \iff \delta^{p-q} \leq \frac{\kappa}{\sigma}L_1^{q-p} \iff \delta \geq \left(\frac{\sigma}{\kappa}\right)^{1/(q-p)}\frac{1}{L_1}.
+\]
+This is a condition for $\delta$ \emph{large enough}: the neighborhood cannot be too small. This creates a tension with the finite termination result (Case~3 in Section~\ref{subsec:regime3}), which also requires $p < q$.
+
+\subsubsection{Restarted case ($k \in \mathcal{R}$)}
+
+For restarted iterations, $d_k = -g_k$ and $\alpha_k = 1/L_1$. The step length is:
+\[
+\|x_{k+1} - x_k\| = \frac{1}{L_1}\|g_k\| \leq \frac{1}{L_1} \cdot L_1\delta = \delta.
+\]
+No condition on any parameter is needed: the step length is always bounded by $\delta$.
+
+By the triangle inequality, for both cases:
+\[
+\|x_{k+1} - x^\star\| \leq \|x_{k+1} - x_k\| + \|x_k - x^\star\| \leq \delta + \delta = 2\delta.
+\]
+Therefore $x_{k+1} \in B(x^\star, 2\delta)$, completing the induction.
+\end{proof}
+
+\subsection{Are we staying in Regime 3 (Same proof technique as in \ref{subsubsec:staying})}
+By using the exact same proof technique as in \ref{subsubsec:staying}, but replacing $B(x^\star, 2\delta)$ by $B(x^\star, \delta)$, we find the following condition in the contradiction:
+\begin{equation}
+    L_1 \geq \gamma .
+\end{equation}
+
+This is always true, meaning that we can prove that we stay in Regime~3 only for $L_1 = \gamma$, which is the most well-posed a problem can be.
+This proof technique only allows to prove that we stay in Regime 3 once we enter it for perfect quadratic (i.e. condition number is 1) functions, that is 
+function of the form $f(x) = x^T A x + b^T x +c$ with $A = \gamma I$. This is a well-known not interesting result.
+
+
+\subsection{Staying in Regime 3 (Using gradient norm bounds)}
+
+We attempt to prove that iterates eventually enter and stay in $B(x^\star, \delta)$, not just $B(x^\star, 2\delta)$, by showing that gradient norms shrink, which in turn shrinks step lengths and distances to $x^\star$.
+
+\subsubsection{Restarted case ($k \in \mathcal{R}$)}
+
+For restarted iterations, $d_k = -g_k$, $\alpha_k = 1/L_1$, so $x_{k+1} - x_k = -g_k/L_1$. We expand the gradient at $x_{k+1}$ using a Taylor expansion:
+\[
+\nabla f(x_{k+1}) = \nabla f(x_k) + \nabla^2 f(x_k)(x_{k+1} - x_k) + R_k,
+\]
+where $R_k$ is the remainder. Substituting $x_{k+1} - x_k = -g_k/L_1$:
+\[
+g_{k+1} = g_k - \frac{1}{L_1}\nabla^2 f(x_k)g_k + R_k = \left(I - \frac{\nabla^2 f(x_k)}{L_1}\right)g_k + R_k.
+\]
+
+\paragraph{Bounding the remainder.} We write:
+\[
+R_k = g_{k+1} - g_k - \nabla^2 f(x_k)(x_{k+1} - x_k) = \int_0^1 \left[\nabla^2 f(x_k + t(x_{k+1} - x_k)) - \nabla^2 f(x_k)\right](x_{k+1} - x_k)\, dt.
+\]
+Taking norms and using A2 ($\nabla^2 f$ is $L_2$-Lipschitz):
+\[
+\|R_k\| \leq \int_0^1 \|\nabla^2 f(x_k + t(x_{k+1} - x_k)) - \nabla^2 f(x_k)\| \cdot \|x_{k+1} - x_k\|\, dt \leq \int_0^1 L_2\, t\, \|x_{k+1} - x_k\|^2\, dt = \frac{L_2}{2}\|x_{k+1} - x_k\|^2.
+\]
+Since $\|x_{k+1} - x_k\| = \|g_k\|/L_1$:
+\[
+\|R_k\| \leq \frac{L_2}{2L_1^2}\|g_k\|^2.
+\]
+
+\paragraph{Gradient contraction.} Taking norms in the Taylor expansion:
+\[
+\|g_{k+1}\| \leq \left\|I - \frac{\nabla^2 f(x_k)}{L_1}\right\|\|g_k\| + \|R_k\|.
+\]
+In the strongly convex region $B(x^\star, 2\delta)$, the eigenvalues of $\nabla^2 f(x_k)$ lie in $[\gamma, L_1]$, so the eigenvalues of $I - \nabla^2 f(x_k)/L_1$ lie in $[0, 1 - \gamma/L_1]$. Therefore:
+\begin{equation}
+\label{eq:grad_contraction}
+\|g_{k+1}\| \leq \left(1 - \frac{\gamma}{L_1}\right)\|g_k\| + \frac{L_2}{2L_1^2}\|g_k\|^2.
+\end{equation}
+
+\paragraph{Condition for gradient shrinkage.} We need the right-hand side of~\eqref{eq:grad_contraction} to be strictly less than $\|g_k\|$:
+\[
+\left(1 - \frac{\gamma}{L_1}\right)\|g_k\| + \frac{L_2}{2L_1^2}\|g_k\|^2 < \|g_k\| \iff \frac{L_2}{2L_1^2}\|g_k\| < \frac{\gamma}{L_1}.
+\]
+In the strongly convex region, $\|g_k\| \leq L_1\delta$ (from Section~\ref{subsubsec:entry}). Substituting:
+\[
+\frac{L_2}{2L_1^2} \cdot L_1\delta < \frac{\gamma}{L_1} \iff \frac{L_2}{2L_1}\delta < \frac{\gamma}{L_1} \iff \delta < \frac{2\gamma}{L_2}.
+\]
+Under this condition, gradients shrink at every iteration.
+
+\paragraph{Step length and distance to $x^\star$.} Since gradients shrink, step lengths also shrink:
+\[
+\|x_{k+1} - x_k\| = \frac{\|g_k\|}{L_1} \leq \delta.
+\]
+From strong monotonicity ($\|g_k\| \geq \gamma\|x_k - x^\star\|$, see Section~\ref{subsubsec:entry}):
+\[
+\|x_k - x^\star\| \leq \frac{\|g_k\|}{\gamma}.
+\]
+By the triangle inequality:
+\[
+\|x_{k+1} - x^\star\| \leq \|x_{k+1} - x_k\| + \|x_k - x^\star\| \leq \frac{\|g_k\|}{L_1} + \frac{\|g_k\|}{\gamma} = \|g_k\|\left(\frac{1}{L_1} + \frac{1}{\gamma}\right).
+\]
+For this to be $\leq \delta$, we would need:
+\[
+L_1\delta\left(\frac{1}{L_1} + \frac{1}{\gamma}\right) \leq \delta \iff 1 + \frac{L_1}{\gamma} \leq 1 \iff \frac{L_1}{\gamma} \leq 0,
+\]
+which is impossible. Therefore, the first step after entering $B(x^\star, \delta)$ may leave this ball.
+
+\paragraph{Eventual convergence to $B(x^\star, \delta)$.} Although the first step may leave $B(x^\star, \delta)$, the iterate remains in $B(x^\star, 2\delta)$ (from Proposition~\ref{prop:stay} or~\ref{prop:stay_step}), so the gradient contraction~\eqref{eq:grad_contraction} continues to apply. Under $\delta < 2\gamma/L_2$, the effective contraction rate is:
+\[
+\bar{\rho} := 1 - \frac{\gamma}{L_1} + \frac{L_2\delta}{2L_1} < 1.
+\]
+Iterating from $k_0$:
+\[
+\|g_{k_0+m}\| \leq \bar{\rho}^m \|g_{k_0}\| \leq \bar{\rho}^m L_1\delta.
+\]
+The distance to $x^\star$ satisfies:
+\[
+\|x_{k_0+m} - x^\star\| \leq \frac{\|g_{k_0+m}\|}{\gamma} \leq \frac{\bar{\rho}^m L_1\delta}{\gamma}.
+\]
+The step length at iteration $m$:
+\[
+\|x_{k_0+m+1} - x_{k_0+m}\| \leq \frac{\|g_{k_0+m}\|}{L_1} \leq \bar{\rho}^m\delta.
+\]
+By the triangle inequality:
+\[
+\|x_{k_0+m+1} - x^\star\| \leq \bar{\rho}^m\delta + \frac{\bar{\rho}^m L_1\delta}{\gamma} = \bar{\rho}^m\delta\left(1 + \frac{L_1}{\gamma}\right).
+\]
+This is $\leq \delta$ when:
+\[
+\bar{\rho}^m\left(1 + \frac{L_1}{\gamma}\right) \leq 1.
+\]
+Taking logarithms and using $-\log\bar{\rho} \geq \frac{2\gamma - L_2\delta}{2L_1}$:
+\begin{equation}
+\label{eq:transient}
+m^\star_{\mathcal{R}} = \left\lceil\frac{2L_1\log\left(1 + L_1/\gamma\right)}{2\gamma - L_2\delta}\right\rceil.
+\end{equation}
+After $m^\star_{\mathcal{R}}$ restarted iterations in the strongly convex region, all subsequent iterates remain in $B(x^\star, \delta)$.
+
+\paragraph{Summary.} Under $\delta < 2\gamma/L_2$:
+\begin{enumerate}
+    \item Gradient norms shrink geometrically: $\|g_{k+1}\| \leq \bar{\rho}\|g_k\|$ with $\bar{\rho} < 1$.
+    \item Iterates stay in $B(x^\star, 2\delta)$ from the first iteration $k_0$.
+    \item After a transient phase of $m^\star_{\mathcal{R}}$ iterations~\eqref{eq:transient}, iterates enter and stay in $B(x^\star, \delta)$.
+\end{enumerate}
+
+\subsubsection{Non-Restarted Case ($k \in \mathcal{N}$)}
 
 \bibliographystyle{plain}
 \bibliography{refs} 
