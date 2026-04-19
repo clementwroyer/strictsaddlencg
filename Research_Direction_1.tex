@@ -891,6 +891,144 @@ For $r = 1$ ($p = q$), this gives $\rho_k = \frac{L_1}{\gamma} - \frac{\sigma^2}
 \]
 Since $\sigma \leq 1$ and $\kappa \geq 1$, we have $\frac{\sigma^2}{\kappa^2} \leq 1$. But $\kappa_f - 1 > 1$ whenever $\kappa_f > 2$, which is the case for any moderately ill-conditioned problem. The condition is therefore not satisfiable in general.
 
+\subsubsection{Non-Restarted Case ($k \in \mathcal{N}$) — Defining $d_k = -H_k g_k$}
+
+We write the non-restarted direction as $d_k = -H_k g_k$, where $H_k$ is a positive definite matrix defined implicitly by the conjugate gradient update $d_k = -g_k + \beta_k d_{k-1}$. We denote the eigenvalues of $H_k$ by $\lambda_{\min}^H$ and $\lambda_{\max}^H$.
+
+\paragraph{Step 1: Taylor expansion.} Expanding the gradient at $x_{k+1}$:
+\[
+g_{k+1} = g_k + \nabla^2 f(x_k)(x_{k+1} - x_k) + R_k.
+\]
+Since $x_{k+1} - x_k = \alpha_k d_k = -\alpha_k H_k g_k$:
+\[
+g_{k+1} = g_k - \alpha_k \nabla^2 f(x_k) H_k g_k + R_k = \left(I - \alpha_k H_k \nabla^2 f(x_k)\right)g_k + R_k.
+\]
+
+\paragraph{Step 2: Bound the remainder.} Using A2 and the fundamental theorem of calculus:
+\[
+\|R_k\| \leq \frac{L_2}{2}\|x_{k+1} - x_k\|^2 = \frac{L_2}{2}\|\alpha_k H_k g_k\|^2 \leq \frac{L_2\alpha_k^2(\lambda_{\max}^H)^2}{2}\|g_k\|^2.
+\]
+Substituting $\alpha_k = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$:
+\begin{equation}
+\label{eq:Rk_NR}
+\|R_k\| \leq \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}\|g_k\|^{2(2+p-2q)}.
+\end{equation}
+
+\paragraph{Step 3: Gradient contraction.} Taking norms in the Taylor expansion:
+\[
+\|g_{k+1}\| \leq \left\|I - \alpha_k H_k \nabla^2 f(x_k)\right\|\|g_k\| + \|R_k\|.
+\]
+In $B(x^\star, 2\delta)$, eigenvalues of $\nabla^2 f(x_k)$ lie in $[\gamma, L_1]$ and those of $H_k$ in $[\lambda_{\min}^H, \lambda_{\max}^H]$. The eigenvalues of $I - \alpha_k H_k \nabla^2 f(x_k)$ lie in:
+\[
+\left[1 - \alpha_k\lambda_{\max}^H L_1,\; 1 - \alpha_k\lambda_{\min}^H\gamma\right].
+\]
+Assuming all eigenvalues are nonnegative ($\alpha_k\lambda_{\max}^H L_1 \leq 1$), the operator norm is:
+\[
+\left\|I - \alpha_k H_k \nabla^2 f(x_k)\right\| = 1 - \alpha_k\lambda_{\min}^H\gamma = 1 - \frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2}\|g_k\|^{1+p-2q}.
+\]
+Combining with~\eqref{eq:Rk_NR}:
+\begin{equation}
+\label{eq:grad_contraction_NR_full}
+\|g_{k+1}\| \leq \left(1 - \frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2}\|g_k\|^{1+p-2q}\right)\|g_k\| + \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}\|g_k\|^{2(2+p-2q)}.
+\end{equation}
+Factoring out $\|g_k\|$:
+\[
+\|g_{k+1}\| \leq \|g_k\|\left(1 - \frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2}\|g_k\|^{1+p-2q} + \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}\|g_k\|^{2(2+p-2q)-1}\right).
+\]
+Letting $u := \|g_k\|^{1+p-2q}$, we note that $2(2+p-2q)-1 = (1+p-2q) + (2+p-2q)$, so $\|g_k\|^{2(2+p-2q)-1} = u \cdot \|g_k\|^{2+p-2q}$. The contraction factor becomes:
+\begin{equation}
+\label{eq:rho_k_NR}
+\rho_k := 1 - u\left(\frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2} - \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}\|g_k\|^{2+p-2q}\right).
+\end{equation}
+
+\paragraph{Step 4: Condition for gradient shrinkage.} We need $\rho_k < 1$, i.e., the term in parentheses must be positive:
+\[
+\frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2} > \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}\|g_k\|^{2+p-2q}.
+\]
+Rearranging:
+\[
+\|g_k\|^{2+p-2q} < \frac{2\sigma\lambda_{\min}^H\gamma L_1}{\kappa^2 L_2(\lambda_{\max}^H)^2}.
+\]
+This must hold for all $k \geq k_0$ with $x_k \in B(x^\star, 2\delta)$. At entry, $\|g_{k_0}\| \leq L_1\delta$, and since we will show gradients shrink, the worst case is at entry. So it suffices to require:
+\begin{equation}
+\label{eq:delta_cond_NR_tight}
+(L_1\delta)^{2+p-2q} < \frac{2\sigma\lambda_{\min}^H\gamma L_1}{\kappa^2 L_2(\lambda_{\max}^H)^2} \iff \delta < \frac{1}{L_1}\left(\frac{2\sigma\lambda_{\min}^H\gamma L_1}{\kappa^2 L_2(\lambda_{\max}^H)^2}\right)^{\frac{1}{2+p-2q}}.
+\end{equation}
+
+\paragraph{Step 5: Effective contraction rate.} Under condition~\eqref{eq:delta_cond_NR_tight}, $\rho_k < 1$ for all $k \geq k_0$. Moreover, since $\|g_{k+1}\| \leq \rho_k\|g_k\| < \|g_k\|$, the contraction rate $\rho_k$ \emph{improves} at each step (since smaller $\|g_k\|$ makes the negative terms in~\eqref{eq:rho_k_NR} smaller, but the positive term $1$ stays). Therefore, the worst-case rate is at the first iteration:
+\begin{equation}
+\label{eq:rho_bar_NR}
+\bar{\rho} := 1 - (L_1\delta)^{1+p-2q}\left(\frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2} - \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}(L_1\delta)^{2+p-2q}\right) < 1.
+\end{equation}
+By induction, for all $m \geq 0$:
+\begin{equation}
+\label{eq:grad_decay_NR_tight}
+\|g_{k_0+m}\| \leq \bar{\rho}^m\|g_{k_0}\| \leq \bar{\rho}^m L_1\delta.
+\end{equation}
+
+\paragraph{Step 6: Step length after $m$ iterations.} Using $\|d_k\| = \|H_k g_k\| \leq \lambda_{\max}^H\|g_k\|$ and $\alpha_k = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$:
+\[
+\|x_{k_0+m+1} - x_{k_0+m}\| = \alpha_k\|d_k\| \leq \frac{\sigma\lambda_{\max}^H}{L_1\kappa^2}\|g_{k_0+m}\|^{2+p-2q}.
+\]
+Substituting~\eqref{eq:grad_decay_NR_tight}:
+\begin{equation}
+\label{eq:step_NR_tight}
+\|x_{k_0+m+1} - x_{k_0+m}\| \leq \frac{\sigma\lambda_{\max}^H}{L_1\kappa^2}(\bar{\rho}^m L_1\delta)^{2+p-2q} = \frac{\sigma\lambda_{\max}^H(L_1\delta)^{2+p-2q}}{L_1\kappa^2}\bar{\rho}^{m(2+p-2q)}.
+\end{equation}
+Since $2+p-2q > 1$, this decays as $\bar{\rho}^{m(2+p-2q)}$, which is faster than $\bar{\rho}^m$.
+
+\paragraph{Step 7: Distance to $x^\star$ after $m$ iterations.} From strong monotonicity ($\|g_k\| \geq \gamma\|x_k - x^\star\|$):
+\begin{equation}
+\label{eq:dist_NR_tight}
+\|x_{k_0+m} - x^\star\| \leq \frac{\|g_{k_0+m}\|}{\gamma} \leq \frac{\bar{\rho}^m L_1\delta}{\gamma}.
+\end{equation}
+
+\paragraph{Step 8: Triangle inequality.} Combining Steps 6 and 7:
+\begin{align*}
+\|x_{k_0+m+1} - x^\star\| &\leq \|x_{k_0+m+1} - x_{k_0+m}\| + \|x_{k_0+m} - x^\star\| \\
+&\leq \frac{\sigma\lambda_{\max}^H(L_1\delta)^{2+p-2q}}{L_1\kappa^2}\bar{\rho}^{m(2+p-2q)} + \frac{\bar{\rho}^m L_1\delta}{\gamma}.
+\end{align*}
+Since $2+p-2q > 1$, for any $m \geq 1$ we have $\bar{\rho}^{m(2+p-2q)} < \bar{\rho}^m$, so the first term is dominated by the second. Bounding:
+\[
+\|x_{k_0+m+1} - x^\star\| \leq \frac{\bar{\rho}^m L_1\delta}{\gamma}\left(1 + \frac{\sigma\lambda_{\max}^H\gamma(L_1\delta)^{1+p-2q}}{L_1\kappa^2}\right).
+\]
+Define:
+\begin{equation}
+\label{eq:A_NR}
+A := \frac{L_1}{\gamma}\left(1 + \frac{\sigma\lambda_{\max}^H\gamma}{L_1\kappa^2}(L_1\delta)^{1+p-2q}\right).
+\end{equation}
+
+\paragraph{Step 9: Solve for $m$.} We need $\|x_{k_0+m+1} - x^\star\| \leq \delta$, i.e.:
+\[
+\bar{\rho}^m \cdot A \leq 1.
+\]
+Taking logarithms. Since $\bar{\rho} < 1$, $\log\bar{\rho} < 0$, dividing flips the inequality:
+\[
+m \geq \frac{\log A}{-\log\bar{\rho}}.
+\]
+To bound $-\log\bar{\rho}$, write $\bar{\rho} = 1 - X$ where:
+\[
+X := (L_1\delta)^{1+p-2q}\left(\frac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2} - \frac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}(L_1\delta)^{2+p-2q}\right) > 0.
+\]
+Using $-\log(1 - X) \geq X$ for $X \in (0,1)$:
+\begin{equation}
+\label{eq:mstar_NR_tight}
+\boxed{m^\star_{\mathcal{N}} \leq \left\lceil\frac{\log A}{(L_1\delta)^{1+p-2q}\left(\dfrac{\sigma\lambda_{\min}^H\gamma}{L_1\kappa^2} - \dfrac{L_2(\sigma\lambda_{\max}^H)^2}{2L_1^2\kappa^4}(L_1\delta)^{2+p-2q}\right)}\right\rceil}
+\end{equation}
+where $A$ is defined in~\eqref{eq:A_NR}, under the condition~\eqref{eq:delta_cond_NR_tight} on $\delta$.
+
+\paragraph{Verification: recovery of the restarted case.} For $H_k = I$ ($\lambda_{\min}^H = \lambda_{\max}^H = 1$) and $p = q = 1$ ($1+p-2q = 0$, $2+p-2q = 1$):
+\begin{itemize}
+    \item $(L_1\delta)^{1+p-2q} = 1$ and $(L_1\delta)^{2+p-2q} = L_1\delta$.
+    \item The denominator becomes $\frac{\sigma\gamma}{L_1\kappa^2} - \frac{L_2\sigma^2}{2L_1^2\kappa^4}L_1\delta$. For $\sigma = \kappa = 1$: $\frac{\gamma}{L_1} - \frac{L_2\delta}{2L_1} = \frac{2\gamma - L_2\delta}{2L_1}$.
+    \item $A = \frac{L_1}{\gamma}(1 + \frac{\sigma\gamma}{L_1\kappa^2}) \approx \frac{L_1}{\gamma}$ for typical parameters, so $\log A \approx \log(L_1/\gamma)$.
+    \item This gives $m^\star \approx \frac{2L_1\log(L_1/\gamma)}{2\gamma - L_2\delta}$, matching $m^\star_{\mathcal{R}}$ from~\eqref{eq:transient}.
+\end{itemize}
+
+\begin{remark}
+The eigenvalues $\lambda_{\min}^H$ and $\lambda_{\max}^H$ of the implicit preconditioner $H_k$ are not known in general for nonlinear conjugate gradient. Bounding them requires assumptions on the conjugate direction parameter $\beta_k$ and is specific to each CG variant (FR, PRP+, HZ, etc.). For a specific $\beta_k$ formula, these eigenvalues can be estimated, yielding a concrete expression for $m^\star_{\mathcal{N}}$.
+\end{remark}
+
 \bibliographystyle{plain}
 \bibliography{refs} 
 
