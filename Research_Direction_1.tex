@@ -33,38 +33,38 @@
 In this work, we revisit the Hybrid Gradient and Negative Curvature Descent from~\cite{WrightMa2022}
 using the Non-linear Conjugate Gradient with modified restart from~\cite{RoyerChan2022}. 
 The first part is an analysis of the complexity of the Hybrid Non-Linear Conjugate Gradient (NCG) and Negative Curvature Descent (NCD) algorithm
-for an arbitrary non-convex function. We study this setting under the hypothesis that we know the Lipschitz constants. Therefore, no line search is performed in this case.
-This is the trivial case where the complexity of the algorithm is simply the sum of the complexities found in the two papers mentioned:
+for an arbitrary non-convex function. We study this setting under the hypothesis of known Lipschitz constants. 
+Therefore, no line search is performed in this case. This case is trivial as the 
+complexity of the algorithm is simply the sum of the complexities found in the two papers mentioned:
 \begin{equation}
-    K = O(\epsilon_g^{-2} + \epsilon_g^{-\max\{1+p, 2(1+p-q)\}} + \epsilon_H^{-3})
+    K = O(\epsilon_g^{-2} + \epsilon_g^{-2(1+p-q)} + \epsilon_H^{-3})
 \end{equation}
 
-Subsequently, we analyze the hybrid framework under the hypothesis that the non-convex function follows the strict saddle property. 
-This setting gives us three regimes to analyze based on the strit saddle conditions:
+Subsequently, we analyze the hybrid framework under the hypothesis that the non-convex function 
+follows the strict saddle property. This setting gives us three regimes to analyze based on the strit saddle conditions:
 \begin{itemize}
-    \item \textbf{Regime 1}: High gradient. In this case, we apply the standard NCG algorithm considered in~\cite{RoyerChan2022}. We get the same complexity (up to constants):
+    \item \textbf{Regime 1}: High gradient. In this case, we apply the standard NCG algorithm considered 
+    in~\cite{RoyerChan2022}. We get the same complexity (up to constants):
     \begin{equation}
-        K = O(\alpha^{-2} + \alpha^{-\max\{1+p, 2(1 + p - q)\}})
+        K = O(\alpha^{-2} + \alpha^{-2(1 + p - q)})
     \end{equation}
-    \item \textbf{Regime 2}: Negative Curvature. In this case, we apply the standard NCD algroithm considered in~\cite{WrightMa2022}. We get the same complexity:
+    \item \textbf{Regime 2}: Negative Curvature. In this case, we apply the standard NCD algorithm 
+    considered in~\cite{WrightMa2022}. We get the same complexity:
     \begin{equation}
         K = O(\beta^{-3})
     \end{equation}
-    \item \textbf{Regime 3}: Local strong convexity. This case is where we innovate. It further partitions the analysis into 3 cases:
+    \item \textbf{Regime 3}: Local strong convexity. The complexity of this regime is partitioned into 3 cases based 
+    on values of $p$ and $q$:
         \begin{itemize}
         \item The power $1+p-q = 1$: This case gives us the same rate as the restarted case (i.e. Gradient Descent)
         \item The power $1+p-q$ is different from one. This gives us new complexities shown in Section~\ref{sec:strict_saddle}.
     \end{itemize}
 \end{itemize}
 
-I was also able to prove that once we enter Regime~3, we stay on the strong convexity region ($B(x^\star, 2\delta)$) thereafter. I actually proved it twice with 2 different techniques
-(while trying to prove that entering R3 meant staying in R3), and each lead to condition on different parameters. The first proof, using descent lemma and strong convexity
-equations lead to a condition on the Lipschitz constant, with respect to the strog convexity constant. This is not very god since those are hard to control.
-The second proof leads to a condition on the $\delta$ parameter, with respect to $\sigma, \kappa, p, q$ and the smoothness constant, which is a bit better. 
-
-However, I was not able to prove that once we enter regime 3,
-we stay on regime 3 ($B(x^\star, \delta)$) thereafter, and I think it is impossible to prove (at least starting at iteration $k_0$, the first iteration at which we enter Regime~3).
-However, what I am currently working on 
+In Section~\ref{sec:regime3stay}, we first prove that once we enter regime~3, we stay in the strong convexity
+region $B(x^\star, 2\delta)$. We also show that it is not possible to prove that once we enter Regime~3, we stay in 
+regime~3 from the first iteration done in this regime ($B(x^\star, \delta)$). However, we find specific values for the number of iterations done in regime~3 after which
+we stay in regime~3 for both the restarted and non-restarted cases.
 
 % -------------------- SECTION 1 - SETTING + ASSUMPTIONS --------------------
 
@@ -76,17 +76,19 @@ We consider the unconstrained optimization problem
 \label{eq:problem}
 \min_{x \in \mathbb{R}^n} f(x),
 \end{equation}
-where $f : \mathbb{R}^n \to \mathbb{R}$ is twice continuously differentiable. We write $g_k = \nabla f(x_k)$ for the gradient at iterate $x_k$.
+where $f : \mathbb{R}^n \to \mathbb{R}$ is twice continuously differentiable. 
+We write $g_k = \nabla f(x_k)$ for the gradient at iterate $x_k$, $x^\star$ the minimizer of $f$ and 
+$f(x^\star)$ the minimum value of $f$.
 
 We make the following standing assumptions throughout.
 
 \begin{description}
     \item[A1.] $\nabla f$ is $L_1$-Lipschitz continuous: $\|\nabla f(x) - \nabla f(y)\| \leq L_1 \|x - y\|$ for all $x, y \in \mathbb{R}^n$.
     \item[A2.] $\nabla^2 f$ is $L_2$-Lipschitz continuous: $\|\nabla^2 f(x) - \nabla^2 f(y)\| \leq L_2 \|x - y\|$ for all $x, y \in \mathbb{R}^n$.
-    \item[A3.] $f$ is bounded below: there exists $f_{\text{low}} \in \mathbb{R}$ such that $f(x) \geq f_{\text{low}}$ for all $x \in \mathbb{R}^n$.
+    \item[A3.] $f$ is bounded below: there exists $f(x^\star) \in \mathbb{R}$ such that $f(x) \geq f(x^\star)$ for all $x \in \mathbb{R}^n$.
 \end{description}
 
-We denote the initial gap to the minimum by $\Delta f := f(x_0) - f_{\text{low}}$.
+We denote the gap to the minimum by $\Delta_i := f(x_i) - f(x^\star)$.
 
 \subsection{Partition of iterations}
 
@@ -266,7 +268,7 @@ We first analyze Algorithm~\ref{algo:hybrid} on a general nonconvex function sat
 Under A1--A3, Algorithm~\ref{algo:hybrid} reaches a point satisfying $\|\nabla f(x_\star)\| \leq \varepsilon_g$ and $-\lambda_{\min}(\nabla^2 f(x_\star)) \leq \varepsilon_H$ in at most $K$ iterations, where:
 \begin{equation}
 \label{eq:bound_arbitrary}
-K \leq \frac{\Delta f}{c_{\mathcal{R}}}\,\varepsilon_g^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\varepsilon_g^{-2(1+p-q)} + \frac{3L_2^2\,\Delta f}{2}\,\varepsilon_H^{-3}.
+K \leq \frac{\Delta_0}{c_{\mathcal{R}}}\,\varepsilon_g^{-2} + \frac{\Delta_0}{c_{\mathcal{N}}}\,\varepsilon_g^{-2(1+p-q)} + \frac{3L_2^2\,\Delta_0}{2}\,\varepsilon_H^{-3}.
 \end{equation}
 \end{theorem}
 
@@ -279,13 +281,13 @@ By Lemma~\ref{lem:decrease_N}, each non-restarted NCG iteration decreases $f$ by
 
 Telescoping and using A3:
 \[
-\Delta f \geq K^1_{\mathcal{R}} \cdot c_{\mathcal{R}}\,\varepsilon_g^2 + K^1_{\mathcal{N}} \cdot c_{\mathcal{N}}\,\varepsilon_g^{2(1+p-q)} + K^2 \cdot \frac{2\varepsilon_H^3}{3L_2^2}.
+\Delta_0 \geq K^1_{\mathcal{R}} \cdot c_{\mathcal{R}}\,\varepsilon_g^2 + K^1_{\mathcal{N}} \cdot c_{\mathcal{N}}\,\varepsilon_g^{2(1+p-q)} + K^2 \cdot \frac{2\varepsilon_H^3}{3L_2^2}.
 \]
-Since all terms are positive, each is individually bounded by $\Delta f$. Summing the resulting bounds on $K^1_{\mathcal{R}}$, $K^1_{\mathcal{N}}$, and $K^2$ gives~\eqref{eq:bound_arbitrary}.
+Since all terms are positive, each is individually bounded by $\Delta_0$. Summing the resulting bounds on $K^1_{\mathcal{R}}$, $K^1_{\mathcal{N}}$, and $K^2$ gives~\eqref{eq:bound_arbitrary}.
 \end{proof}
 
 \begin{remark}
-The bound~\eqref{eq:bound_arbitrary} is conservative because each group uses the full budget $\Delta f$ independently. The NCG terms match those of Theorem~3.1 in~\cite{RoyerChan2022} (up to constants due to the absence of line search), while the NCD term follows from~\cite{WrightMa2022}.
+The bound~\eqref{eq:bound_arbitrary} is conservative because each group uses the full budget $\Delta_0$ independently. The NCG terms match those of Theorem~3.1 in~\cite{RoyerChan2022} (up to constants due to the absence of line search), while the NCD term follows from~\cite{WrightMa2022}.
 \end{remark}
 
 % -------------------- SECTION 5 - STRICT SADDLE FUNCTION - THE HEART OF THE ANALYSIS --------------------
@@ -321,7 +323,7 @@ $\mathcal{R}^3$: & restarted in Regime 3 & ($|\mathcal{R}^3| = K^3_{\mathcal{R}}
 \end{center}
 The total iteration count is $K = K^1_{\mathcal{N}} + K^1_{\mathcal{R}} + K^2 + K^3_{\mathcal{N}} + K^3_{\mathcal{R}}$.
 
-All iterations draw from the single decrease budget $\Delta f$:
+All iterations draw from the single decrease budget $\Delta_0$:
 \begin{equation}
 \label{eq:budget}
 \begin{split}
@@ -834,6 +836,7 @@ The overall bound strictly improves over GD only when $K^1_{\mathcal{R}} + K^3_{
 % ------------------- Analysis of staying in REGIME 3 (ONGOING) -------------------
 
 \section{Regime 3 Analysis}
+\label{sec:regime3stay}
 
 \subsection{Staying in Strong-Convexity Region (proof 1 using strongly convex + descent lemma)}
 \label{subsubsec:staying}
