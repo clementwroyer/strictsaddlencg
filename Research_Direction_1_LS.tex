@@ -1,0 +1,726 @@
+\documentclass[11pt,a4paper]{article}
+
+%-----------------------------------------------------------------
+% Packages
+%-----------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+%-----------------------------------------------------------------
+% Theorem environments
+%-----------------------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+
+\crefname{theorem}{Theorem}{Theorems}
+\Crefname{theorem}{Theorem}{Theorems}
+\crefname{proposition}{Proposition}{Propositions}
+\Crefname{proposition}{Proposition}{Propositions}
+\crefname{lemma}{Lemma}{Lemmas}
+\Crefname{lemma}{Lemma}{Lemmas}
+\crefname{corollary}{Corollary}{Corollaries}
+\Crefname{corollary}{Corollary}{Corollaries}
+\crefname{definition}{Definition}{Definitions}
+\Crefname{definition}{Definition}{Definitions}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+\crefname{remark}{Remark}{Remarks}
+\Crefname{remark}{Remark}{Remarks}
+
+%-----------------------------------------------------------------
+% Macros
+%-----------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\inner}[2]{\left\langle #1,#2 \right\rangle}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\epsg}{\eps_{g}}
+\newcommand{\epsH}{\eps_{H}}
+\newcommand{\grad}{\nabla}
+\newcommand{\hess}{\nabla^{2}}
+\newcommand{\xstar}{x^{\star}}
+\newcommand{\fstar}{f^{\star}}
+\newcommand{\flow}{f_{\mathrm{low}}}
+\newcommand{\Lone}{L_{1}}
+\newcommand{\Ltwo}{L_{2}}
+\newcommand{\setN}{\mathcal{N}}
+\newcommand{\setR}{\mathcal{R}}
+\newcommand{\cN}{c_{\setN}}
+\renewcommand{\d}{d}
+
+%-----------------------------------------------------------------
+% Title
+%-----------------------------------------------------------------
+\title{Complexity of Nonlinear Conjugate Gradient Methods\\
+on Strict Saddle Functions:\\
+The Line-Search Setting}
+\author{Benjamin \\ \small Supervised by Cl\'ement Royer \\ \small LAMSADE}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study the complexity of nonlinear conjugate gradient (NCG) methods on strict saddle functions with backtracking line-search. 
+We consider a hybrid algorithm that combines an NCG step with a modified restart condition and a negative-curvature direction step, 
+and we establish complexity bounds in three regimes corresponding to the strict saddle decomposition: large-gradient (Regime~1), negative-curvature (Regime~2), 
+and strong-convexity neighborhoods of local minimizers (Regime~3). The decrease lemmas in the NCG phase are inherited from \cite{RoyerChan2022}; 
+the negative-curvature phase analysis is independent of the line search and is reused from \cite{WrightMa2022}; 
+and the strong-convexity phase is analyzed under a phase split based on the magnitude of the gradient.
+\end{abstract}
+
+\tableofcontents
+
+%=================================================================
+\section{Introduction}\label{sec:intro}
+
+\textit{[To be written. Motivation, related work, contributions, organization.]}
+
+%=================================================================
+\section{Setting and Algorithm}\label{sec:setting}
+
+
+\subsection{Problem setting}\label{subsec:problem}
+
+We consider the unconstrained minimization problem
+\begin{equation}\label{eq:problem}
+\min_{x \in \R^{d}} f(x),
+\end{equation}
+where $f \colon \R^{d} \to \R$ is nonconvex and satisfies the strict saddle property. We make the following standing assumptions.
+
+\begin{assumption}[Smoothness]\label{ass:smooth}
+The function $f$ is continuously differentiable on $\R^{d}$, and its gradient $\grad f$ is $\Lone$-Lipschitz continuous, with $\Lone > 0$.
+\end{assumption}
+
+\begin{assumption}[Lower bound]\label{ass:lb}
+There exists $\flow \in \R$ such that $f(x) \geq \flow$ for all $x \in \R^{d}$.
+\end{assumption}
+
+We further assume the strict saddle property; the precise statement (in terms of parameters $\zeta, \beta, \gamma, \delta$) is recalled in \Cref{subsec:strict-saddle}. 
+We denote $g_{k} := \grad f(x_{k})$.
+
+\subsection{Strict saddle property}\label{subsec:strict-saddle}
+
+\begin{definition}[\cite{GeSaddle15}]
+\label{def:strict_saddle}
+A differentiable function $f:\mathbb{R}^n\to\mathbb{R}$ is
+$(\zeta,\beta,\gamma,\delta)$-\emph{strict saddle} with parameters $\zeta \in (0, 1]$, $\beta > 0$, $\gamma > 0$, $\delta > 0$
+if, for every
+$x\in\mathbb{R}^n$, at least one of the following holds:
+\begin{enumerate}
+  \item \textbf{(Large gradient)}\quad $\|\nabla f(x)\|\geq\zeta$,
+  \item \textbf{(Negative curvature)}\quad
+        $\lambda_{\min}(\nabla^2 f(x))\leq-\beta$,
+  \item \textbf{(Near a local minimizer)}\quad there exists a local
+        minimizer $\xstar$ with $\|x - \xstar\| \leq \delta$ such that $f$ is
+        $\gamma$-strongly convex on $B(\xstar, 2\delta)$.
+\end{enumerate}
+\end{definition}
+
+\begin{remark}\label{rem:zeta-bound}
+The restriction $\zeta \leq 1$ is a normalization convention used in the complexity analysis: it ensures that for any exponent $a \geq 0$, $\zeta^{a}$ is non-increasing in $a$,
+which simplifies the form of the Regime~1 bound (\Cref{thm:regime1}).
+\end{remark}
+
+\subsection{Hybrid algorithm with line search}\label{subsec:algorithm}
+
+We analyze the hybrid algorithm presented in \Cref{alg:hybrid-ls}. The algorithm interleaves an NCG step (when the gradient norm exceeds the tolerance $\epsg$) with a negative-curvature step (when the smallest eigenvalue of the Hessian is below $-\epsH$). The NCG step uses backtracking Armijo line search initialized at $\alpha = 1$, with contraction factor $\theta \in (0,1)$ and Armijo constant $\eta \in (0,1)$. The conjugate direction is reset to the negative gradient when a modified restart condition is triggered.
+
+\begin{algorithm}
+\caption{Hybrid NCG / Negative-Curvature Algorithm with Line Search}\label{alg:hybrid-ls}
+\begin{algorithmic}[1]
+\Require $x_{0} \in \R^{d}$, $\eta \in (0,1)$, $\theta \in (0,1)$, $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, $\epsg > 0$, $\epsH > 0$.
+\State Set $g_{0} = \grad f(x_{0})$, $\d_{0} = -g_{0}$, $k = 0$.
+\For{$k = 0, 1, 2, \dots$}
+  \State Compute $g_{k} = \grad f(x_{k})$.
+  \If{$\norm{g_{k}} \geq \epsg$} \Comment{NCG phase}
+    \State Compute $\alpha_{k} = \theta^{j_{k}}$, where $j_{k}$ is the smallest nonnegative integer such that
+    \begin{equation}\label{eq:armijo}
+      f(x_{k} + \alpha_{k} \d_{k}) \leq f(x_{k}) + \eta\,\alpha_{k}\,g_{k}^{\top} \d_{k}.
+    \end{equation}
+    \State Set $x_{k+1} = x_{k} + \alpha_{k} \d_{k}$ and $g_{k+1} = \grad f(x_{k+1})$.
+    \State Choose a conjugate direction parameter $\beta_{k+1}$.
+    \State Set $\d_{k+1} = -g_{k+1} + \beta_{k+1} \d_{k}$.
+    \If{the restart condition holds:
+      \begin{equation}\label{eq:restart}
+        g_{k+1}^{\top} \d_{k+1} \geq -\sigma\,\norm{g_{k+1}}^{1+p}
+        \quad\text{or}\quad
+        \norm{\d_{k+1}} \geq \kappa\,\norm{g_{k+1}}^{q},
+      \end{equation}}
+      \State Restart: $\d_{k+1} = -g_{k+1}$.
+    \EndIf
+  \Else \Comment{Negative-curvature phase}
+    \State Compute the smallest eigenvalue $\lambda_{k}$ and an associated eigenvector $e_{k}$ of $\hess f(x_{k})$, with sign chosen so that $\inner{g_{k}}{e_{k}} \leq 0$.
+    \If{$-\lambda_{k} \geq \epsH$}
+      \State Set $x_{k+1} = x_{k} + \frac{2 \lambda_{k}}{\Ltwo}\,e_{k}$.
+      \State Reset $\d_{k+1} = -\grad f(x_{k+1})$.
+    \Else
+      \State \textbf{stop} and \textbf{return} $\xstar = x_{k}$.
+    \EndIf
+  \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Index partition}\label{subsec:partition}
+
+Following the convention of \cite{RoyerChan2022}, we partition the NCG iterations according to whether the restart condition is triggered. Define
+\begin{align}
+\setN &:= \left\{ k \in \N \;:\; g_{k}^{\top} \d_{k} \leq -\sigma\,\norm{g_{k}}^{1+p}
+\;\text{ and }\; \norm{\d_{k}} \leq \kappa\,\norm{g_{k}}^{q} \right\}, \label{eq:def-N}\\
+\setR &:= \N \setminus \setN. \label{eq:def-R}
+\end{align}
+Indices in $\setN$ correspond to non-restart NCG steps; indices in $\setR$ correspond to restart steps (where $\d_{k} = -g_{k}$).
+
+%=================================================================
+\section{Decrease Lemmas}\label{sec:decrease}
+
+
+We reuse the decrease lemmas of \cite{RoyerChan2022}; we recall them here for completeness, in the form needed in the sequel.
+
+\begin{lemma}[\protect{\cite[Lemma~3.1]{RoyerChan2022}}]\label{lem:line-search-N}
+Let \Cref{ass:smooth} hold, and let $k \in \setN$ such that $\norm{g_{k}} > 0$. Then, the line-search process terminates after at most $\lfloor \bar{\jmath}_{\setN, k} + 1 \rfloor$ iterations, where
+\begin{equation}\label{eq:jbar-N}
+\bar{\jmath}_{\setN, k}
+:= \left[ \log_{\theta}\!\left( \frac{2(1-\eta)\,\sigma}{\kappa^{2}\,\Lone}\right)
+\norm{g_{k}}^{1+p-2q} \right]_{+}.
+\end{equation}
+Moreover, the resulting decrease at the $k$th iteration satisfies
+\begin{equation}\label{eq:decrease-N}
+f(x_{k}) - f(x_{k+1})
+\;>\; \cN \,\min\!\left\{ \norm{g_{k}}^{1+p},\;\; \norm{g_{k}}^{2(1+p-q)} \right\},
+\end{equation}
+where
+\begin{equation}\label{eq:cN}
+\cN := \eta\,\sigma\,\min\!\left\{ 1,\;\; \frac{2(1-\eta)\,\sigma\,\theta}{\kappa^{2}\,\Lone} \right\}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+See the proof of Lemma~3.1 in \cite{RoyerChan2022}.
+\end{proof}
+
+
+\begin{lemma}[\protect{\cite[Lemma~3.2]{RoyerChan2022}}]\label{lem:line-search-R}
+Let \Cref{ass:smooth} hold, and let $k \in \setR$ such that $\norm{g_{k}} > 0$. Then, the line-search process terminates after at most $\bar{\jmath}_{\setR} + 1$ iterations, where
+\begin{equation}\label{eq:jbar-R}
+\bar{\jmath}_{\setR}
+:= \left[ \log_{\theta}\!\left( \frac{2(1-\eta)}{\Lone}\right) \right]_{+}.
+\end{equation}
+Moreover, the resulting decrease at the $k$th iteration satisfies
+\begin{equation}\label{eq:decrease-R}
+f(x_{k}) - f(x_{k+1})
+\;>\; c_{\setR}\,\norm{g_{k}}^{2},
+\end{equation}
+where
+\begin{equation}\label{eq:cR}
+c_{\setR} := \eta\,\min\!\left\{ 1,\;\; \frac{2(1-\eta)\,\theta}{\Lone} \right\}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+See the proof of Lemma~3.2 in \cite{RoyerChan2022}.
+\end{proof}
+
+
+\begin{lemma}[\protect{\cite[Theorem~9.5]{WrightMa2022}}]
+\label{lem:decrease_NCD}
+Let A1--A2 hold and $-\lambda_k \geq \varepsilon_H > 0$. Then the step $x_{k+1} = x_k + \frac{2\lambda_k}{L_2}e_k$ satisfies:
+\begin{equation}
+\label{eq:decrease_NCD}
+f(x_k) - f(x_{k+1}) \geq \frac{2|\lambda_k|^3}{3L_2^2} \geq \frac{2\varepsilon_H^3}{3L_2^2}.
+\end{equation}
+\end{lemma}
+\begin{proof}
+See the proof of Theorem~9.5 in \cite{WrightMa2022}.
+\end{proof}
+
+\begin{remark}
+\label{rem:monotone}
+All three lemmas guarantee $f(x_{k+1}) < f(x_k)$. This monotone decrease property ensures iterates remain within sublevel sets of $f$.
+\end{remark}
+
+%=================================================================
+\section{Complexity in Regime 1: Large Gradient}\label{sec:regime1}
+
+\begin{theorem}[Regime~1 complexity; adapted from \protect{\cite[Theorem~3.1]{RoyerChan2022}}]
+\label{thm:regime1}
+Let \Cref{ass:smooth} and \Cref{ass:lb} hold, and suppose that $1 + p - q \geq 0$. Then, the number of iterations spent in Regime~1 (i.e., iterations $k$ with $\norm{g_{k}} \geq \zeta$) by \Cref{alg:hybrid-ls} is at most
+\begin{equation}\label{eq:K1-bound}
+K_{1} \;\leq\;
+\left\lceil
+\frac{f(x_{0}) - \flow}{c_{\setR}}\,\zeta^{-2}
+\;+\;
+\frac{f(x_{0}) - \flow}{\cN}\,\zeta^{-\max\{1+p,\,2(1+p-q)\}}
+\right\rceil.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Let $K \in \N$ be such that $\norm{g_{k}} \geq \zeta$ for every $k \in \{0, \dots, K-1\}$. Following the partition~\eqref{eq:def-N}--\eqref{eq:def-R}, define
+\begin{align*}
+\setN_{K} &:= \setN \cap \{0, \dots, K-1\}, \\
+\setR_{K} &:= \setR \cap \{0, \dots, K-1\}.
+\end{align*}
+
+For any $k \in \setN_{K}$, \cref{lem:line-search-N} applies, and
+\begin{equation}\label{eq:r1-decrease-N}
+f(x_{k}) - f(x_{k+1}) \;\geq\; \cN\,\min\!\left\{ \norm{g_{k}}^{1+p},\;\; \norm{g_{k}}^{2(1+p-q)} \right\}
+\;\geq\; \cN\,\zeta^{\max\{1+p,\,2(1+p-q)\}},
+\end{equation}
+where the last inequality uses $\norm{g_{k}} \geq \zeta$ together with $1 + p - q \geq 0$ (so that both exponents are nonnegative and the worst case for $\norm{g_{k}}^{r} \geq \zeta^{r}$ corresponds to the larger exponent).
+
+For any $k \in \setR_{K}$, \Cref{lem:line-search-R} applies, and
+\begin{equation}\label{eq:r1-decrease-R}
+f(x_{k}) - f(x_{k+1}) \;\geq\; c_{\setR}\,\norm{g_{k}}^{2} \;\geq\; c_{\setR}\,\zeta^{2}.
+\end{equation}
+
+Summing over $k \in \{0, \dots, K-1\}$ and using \Cref{ass:lb},
+\begin{align*}
+f(x_{0}) - \flow
+&\;\geq\; f(x_{0}) - f(x_{K}) \;=\; \sum_{k=0}^{K-1} \bigl[f(x_{k}) - f(x_{k+1})\bigr] \\
+&\;=\; \sum_{k \in \setN_{K}} \bigl[f(x_{k}) - f(x_{k+1})\bigr]
++ \sum_{k \in \setR_{K}} \bigl[f(x_{k}) - f(x_{k+1})\bigr] \\
+&\;\geq\; |\setN_{K}|\,\cN\,\zeta^{\max\{1+p,\,2(1+p-q)\}}
++ |\setR_{K}|\,c_{\setR}\,\zeta^{2}.
+\end{align*}
+Since both terms on the right-hand side are nonnegative, the inequality implies
+\begin{equation*}
+|\setN_{K}| \;<\; \frac{f(x_{0}) - \flow}{\cN}\,\zeta^{-\max\{1+p,\,2(1+p-q)\}}
+\quad\text{and}\quad
+|\setR_{K}| \;<\; \frac{f(x_{0}) - \flow}{c_{\setR}}\,\zeta^{-2}.
+\end{equation*}
+Using $|\setN_{K}| + |\setR_{K}| = K$ yields
+\begin{equation*}
+K \;<\; \frac{f(x_{0}) - \flow}{c_{\setR}}\,\zeta^{-2}
++ \frac{f(x_{0}) - \flow}{\cN}\,\zeta^{-\max\{1+p,\,2(1+p-q)\}},
+\end{equation*}
+which establishes~\eqref{eq:K1-bound}.
+\end{proof}
+
+%=================================================================
+\section{Complexity in Regime 2: Negative Curvature}\label{sec:regime2}
+
+\begin{theorem}[Regime~2 complexity]\label{thm:regime2}
+Let \Cref{ass:smooth} and \Cref{ass:lb} hold, and suppose that $f$ satisfies the $(\zeta, \beta, \gamma, \delta)$-strict saddle property (\Cref{def:strict_saddle}). Then the number of iterations spent in Regime~2 by \Cref{alg:hybrid-ls} is at most
+\begin{equation}\label{eq:K2-bound}
+K_{2} \;\leq\; \left\lceil \frac{3\,\Ltwo^{2}\,(f(x_{0}) - \flow)}{2\,\beta^{3}} \right\rceil.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+At any iteration $k$ in Regime~2, the iterate $x_{k}$ satisfies $\norm{g_{k}} < \zeta \leq \epsg$ and $\lambda_{\min}\!\bigl(\hess f(x_{k})\bigr) \leq -\beta$. \Cref{alg:hybrid-ls} therefore enters the negative-curvature branch, and since $-\lambda_{k} \geq \beta \geq \epsH$ (assuming $\epsH \leq \beta$), the negative-curvature step is taken. By \Cref{lem:decrease_NCD},
+\begin{equation*}
+f(x_{k}) - f(x_{k+1}) \;\geq\; \frac{2\,|\lambda_{k}|^{3}}{3\,\Ltwo^{2}} \;\geq\; \frac{2\,\beta^{3}}{3\,\Ltwo^{2}}.
+\end{equation*}
+Summing over the $K_{2}$ Regime~2 iterations and using \Cref{ass:lb},
+\begin{equation*}
+f(x_{0}) - \flow \;\geq\; f(x_{0}) - f(x_{K_{2}}) \;\geq\; K_{2}\cdot\frac{2\,\beta^{3}}{3\,\Ltwo^{2}},
+\end{equation*}
+which gives~\eqref{eq:K2-bound}.
+\end{proof}
+%=================================================================
+\section{Complexity in Regime 3: Strong Convexity}\label{sec:regime3}
+
+\subsection{Setting}\label{subsec:r3-setting}
+
+Let $\xstar$ denote the local minimizer associated with the Regime~3 ball: by the strict saddle property (\Cref{def:strict_saddle}), there exists $\xstar$ with $\norm{x_{k_{0}} - \xstar} \leq \delta$ such that $f$ is $\gamma$-strongly convex on $\bar B(\xstar, 2\delta)$, where $k_{0}$ denotes the first iteration entering Regime~3. We write
+\begin{equation}\label{eq:r3-Delta}
+\Delta_{k} \;:=\; f(x_{k}) - f(\xstar)
+\end{equation}
+for the suboptimality at iterate $k$, and we adopt the shorthand
+\begin{equation}\label{eq:r3-abR}
+a := 1 + p, \qquad b := 2(1 + p - q), \qquad R := \frac{\max(a, b)}{2}.
+\end{equation}
+
+\paragraph{Standing inequalities on $\bar B(\xstar, 2\delta)$.}
+For any $x_{k} \in \bar B(\xstar, 2\delta)$, smoothness and strong convexity give, respectively,
+\begin{align}
+\Delta_{k} &\;\leq\; \tfrac{\Lone}{2}\,\norm{x_{k} - \xstar}^{2}, \label{eq:r3-smooth}\\
+\Delta_{k} &\;\geq\; \tfrac{\gamma}{2}\,\norm{x_{k} - \xstar}^{2}, \label{eq:r3-sc}\\
+2\gamma\,\Delta_{k} &\;\leq\; \norm{g_{k}}^{2} \;\leq\; 2\Lone\,\Delta_{k}, \label{eq:r3-grad-norm}
+\end{align}
+where~\eqref{eq:r3-grad-norm} follows from~\eqref{eq:r3-smooth}--\eqref{eq:r3-sc} and the Polyak--{\L}ojasiewicz inequality.
+
+\paragraph{Entry value and gradient bound.}
+At the entry iterate $k_{0}$, $\norm{x_{k_{0}} - \xstar} \leq \delta$ and~\eqref{eq:r3-smooth} give
+\begin{equation}\label{eq:r3-entry}
+\Delta_{k_{0}} \;\leq\; \frac{\Lone\,\delta^{2}}{2}.
+\end{equation}
+Combined with monotonicity of $\Delta_{k}$ (which holds along the line search by Armijo) and~\eqref{eq:r3-grad-norm},
+\begin{equation}\label{eq:r3-grad-bound}
+\norm{g_{k}} \;\leq\; \Lone\,\delta \qquad \text{for all } k \geq k_{0} \text{ with } x_{k} \in \bar B(\xstar, 2\delta).
+\end{equation}
+
+\paragraph{Stopping criterion.}
+The algorithm exits Regime~3 once $\norm{g_{k}} \leq \epsg$. By~\eqref{eq:r3-grad-norm}, a sufficient condition is
+\begin{equation}\label{eq:r3-stop}
+\Delta_{k} \;\leq\; \frac{\epsg^{2}}{2\Lone},
+\end{equation}
+which is the form we use to count iterations.
+
+\paragraph{Per-iteration decrease.}
+We split Regime~3 iterations according to whether the restart condition is triggered. For non-restart steps, $k \in \setN$, \Cref{lem:line-search-N} gives
+\begin{equation}\label{eq:r3-decrease-N}
+\Delta_{k} - \Delta_{k+1} \;\geq\; \cN \,\min\!\left\{ \norm{g_{k}}^{a},\; \norm{g_{k}}^{b} \right\},
+\end{equation}
+where $a = 1+p$ and $b = 2(1+p-q)$. For restart steps, $k \in \setR$, \Cref{lem:line-search-R} gives
+\begin{equation}\label{eq:r3-decrease-R}
+\Delta_{k} - \Delta_{k+1} \;\geq\; c_{\setR}\,\norm{g_{k}}^{2} \;\geq\; 2\gamma\,c_{\setR}\,\Delta_{k},
+\end{equation}
+where the second inequality uses the strong-convexity bound~\eqref{eq:r3-grad-norm}.
+
+The restart-step recurrence~\eqref{eq:r3-decrease-R} is a clean linear contraction and yields the bound
+\begin{equation}\label{eq:r3-restart-bound}
+K_{3}^{\setR} \;\leq\; \left\lceil \frac{1}{2\gamma\,c_{\setR}}\,\log\!\left(\frac{\Lone^{2}\,\delta^{2}}{\epsg^{2}}\right) \right\rceil
+\end{equation}
+on the number of restart steps in Regime~3, by the same argument as in Subcase~L1 below.
+
+For non-restart steps, the presence of the minimum in~\eqref{eq:r3-decrease-N} forces a phase split based on the magnitude of $\norm{g_{k}}$, and subsequently 
+a subcase analysis based on the value of $R := \max(a,b)/2$.
+\subsection{Phase split}\label{subsec:r3-phase}
+
+Since $t \mapsto t^{s}$ is increasing for $t \geq 1$ and decreasing for $0 < t \leq 1$,
+\begin{equation}\label{eq:r3-min-resolved}
+\min\!\bigl(\norm{g_{k}}^{a},\, \norm{g_{k}}^{b}\bigr)
+\;=\;
+\begin{cases}
+\norm{g_{k}}^{\min(a,b)} & \text{if } \norm{g_{k}} \geq 1, \\[2pt]
+\norm{g_{k}}^{\max(a,b)} = \norm{g_{k}}^{2R} & \text{if } \norm{g_{k}} \leq 1.
+\end{cases}
+\end{equation}
+Accordingly, we split the Regime~3 iterations into two phases:
+\begin{itemize}[leftmargin=2.5em]
+  \item \emph{Phase~H} (high gradient): iterations $k$ with $\norm{g_{k}} \geq 1$.
+  \item \emph{Phase~L} (low gradient): iterations $k$ with $\norm{g_{k}} \leq 1$.
+\end{itemize}
+We denote by $K_{3}^{H}$ and $K_{3}^{L}$ the respective iteration counts; the total Regime~3 count is $K_{3} = K_{3}^{H} + K_{3}^{L}$.
+
+\subsection{Phase H bound}\label{subsec:r3-phaseH}
+
+We split Phase~H by the sign of $b = 2(1+p-q)$, since $a = 1+p \geq 1 > 0$ always.
+
+\begin{lemma}[Phase H bound]\label{lem:r3-phaseH}
+Suppose $x_{k} \in \bar B(\xstar, 2\delta)$ for every iterate $k$ in Phase~H. Then:
+\begin{enumerate}[label=(\roman*), leftmargin=2.5em]
+  \item If $q \leq 1+p$ (so $b \geq 0$), then
+  \begin{equation}\label{eq:r3-phaseH-i}
+  K_{3}^{H} \;\leq\; \left\lceil \frac{\Lone\,\delta^{2}}{2\,\cN} \right\rceil.
+  \end{equation}
+  \item If $q > 1+p$ (so $b < 0$), then
+  \begin{equation}\label{eq:r3-phaseH-ii}
+  K_{3}^{H} \;\leq\; \left\lceil \frac{\Lone\,\delta^{2}\,(\Lone\,\delta)^{2(q-1-p)}}{2\,\cN} \right\rceil.
+  \end{equation}
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+By~\eqref{eq:r3-decrease-N} and the fact that $\norm{g_{k}} \geq 1$ in Phase~H,
+\[
+\Delta_{k} - \Delta_{k+1} \;\geq\; \cN\,\norm{g_{k}}^{\min(a,b)}.
+\]
+
+\textbf{Case (i): $q \leq 1+p$.} Then $b \geq 0$, hence $\min(a,b) \geq 0$ and $\norm{g_{k}}^{\min(a,b)} \geq 1$. Summing over Phase~H iterations and using monotonicity of $\Delta_{k}$ together with~\eqref{eq:r3-entry},
+\[
+\frac{\Lone\,\delta^{2}}{2} \;\geq\; \Delta_{k_{0}} \;\geq\; \sum_{k \in \text{Phase H}}(\Delta_{k} - \Delta_{k+1}) \;\geq\; K_{3}^{H}\cdot\cN,
+\]
+which yields~\eqref{eq:r3-phaseH-i}.
+
+\textbf{Case (ii): $q > 1+p$.} Then $b < 0$ and $\min(a,b) = b$. The quantity $\norm{g_{k}}^{b}$ is small when $\norm{g_{k}}$ is large, so we apply the upper bound $\norm{g_{k}} \leq \Lone\delta$ from~\eqref{eq:r3-grad-bound}:
+\[
+\norm{g_{k}}^{b} \;\geq\; (\Lone\delta)^{b} \;=\; (\Lone\delta)^{-2(q-1-p)}.
+\]
+Hence $\Delta_{k} - \Delta_{k+1} \geq \cN\,(\Lone\delta)^{-2(q-1-p)}$. Summing as in Case~(i):
+\[
+\frac{\Lone\,\delta^{2}}{2} \;\geq\; K_{3}^{H}\cdot\cN\,(\Lone\delta)^{-2(q-1-p)},
+\]
+which yields~\eqref{eq:r3-phaseH-ii}.
+\end{proof}
+
+\begin{remark}\label{rem:r3-phaseH-cases}
+Case~(ii) is significantly worse than Case~(i): the bound depends on a positive power of $\Lone\delta$, which can be large. In what follows we focus on the favorable regime $q \leq 1+p$.
+\end{remark}
+
+\subsection{Phase L analysis}\label{subsec:r3-phaseL}
+
+For $k$ in Phase~L (i.e., $\norm{g_{k}} \leq 1$), the per-iteration decrease~\eqref{eq:r3-decrease-N} together with $\max(a,b) = 2R$ and the strong-convexity inequality~\eqref{eq:r3-grad-norm} yields
+\[
+\Delta_{k} - \Delta_{k+1} \;\geq\; \cN\,\norm{g_{k}}^{\max(a,b)} \;=\; \cN\,(\norm{g_{k}}^{2})^{R} \;\geq\; \cN\,(2\gamma\,\Delta_{k})^{R}.
+\]
+Equivalently,
+\begin{equation}\label{eq:r3-phaseL-recurrence}
+\Delta_{k+1} \;\leq\; \bigl(1 - \cN\,(2\gamma)^{R}\,\Delta_{k}^{R-1}\bigr)\,\Delta_{k}.
+\end{equation}
+The behavior of $K_{3}^{L}$ splits into three subcases according to the value of $R$. Throughout this subsection we let $k_{1}$ denote the first iteration of Phase~L; by monotonicity $\Delta_{k_{1}} \leq \Delta_{k_{0}} \leq \Lone\delta^{2}/2$.
+
+\paragraph{Subcase L1: $R = 1$ (linear convergence).}
+
+This subcase corresponds to $p = 1$ and $q \geq 1$, or $p \leq 1$ and $q = p$.
+
+\begin{lemma}[Subcase L1]\label{lem:r3-L1}
+Suppose $x_{k} \in \bar B(\xstar, 2\delta)$ for every iterate $k$ in Phase~L, $R = 1$, and $2\,\cN\,\gamma < 1$. Then
+\begin{equation}\label{eq:r3-L1-bound}
+K_{3}^{L} \;\leq\; \left\lceil \frac{1}{2\,\cN\,\gamma}\,\log\!\left(\frac{\Lone^{2}\,\delta^{2}}{\epsg^{2}}\right) \right\rceil.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+With $R = 1$, the recurrence~\eqref{eq:r3-phaseL-recurrence} simplifies to $\Delta_{k+1} \leq (1 - 2\,\cN\,\gamma)\,\Delta_{k}$. Iterating from $k_{1}$,
+\[
+\Delta_{k_{1}+K} \;\leq\; (1 - 2\,\cN\,\gamma)^{K}\,\Delta_{k_{1}}.
+\]
+A sufficient condition for $\Delta_{k_{1}+K} \leq \epsg^{2}/(2\Lone)$ is $(1 - 2\,\cN\,\gamma)^{K}\,\Delta_{k_{1}} \leq \epsg^{2}/(2\Lone)$. Taking logarithms and dividing by $\log(1 - 2\,\cN\,\gamma) < 0$ (which flips the inequality):
+\[
+K \;\geq\; \frac{\log\bigl(2\Lone\Delta_{k_{1}}/\epsg^{2}\bigr)}{-\log(1 - 2\,\cN\,\gamma)} \;\geq\; \frac{\log\bigl(2\Lone\Delta_{k_{1}}/\epsg^{2}\bigr)}{2\,\cN\,\gamma},
+\]
+where the last inequality uses $-\log(1-x) \geq x$ for $x \in [0,1)$. Substituting $\Delta_{k_{1}} \leq \Lone\delta^{2}/2$ gives $2\Lone\Delta_{k_{1}}/\epsg^{2} \leq \Lone^{2}\delta^{2}/\epsg^{2}$, which yields~\eqref{eq:r3-L1-bound}.
+\end{proof}
+
+\paragraph{Subcase L2: $R < 1$ (finite termination).}
+
+This subcase corresponds to $p < 1$ and $q > p$.
+
+\begin{lemma}[Subcase L2]\label{lem:r3-L2}
+Suppose $x_{k} \in \bar B(\xstar, 2\delta)$ for every iterate $k$ in Phase~L, and $R < 1$. Then
+\begin{equation}\label{eq:r3-L2-bound}
+K_{3}^{L} \;\leq\; \left\lceil \frac{(\Lone\delta^{2}/2)^{1-R}}{(1-R)\,\cN\,(2\gamma)^{R}} \right\rceil.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Define the Lyapunov function $\varphi_{k} := \Delta_{k}^{1-R}$. Since $1-R \in (0,1)$, the map $t \mapsto t^{1-R}$ is increasing and concave on $(0,\infty)$. Raising both sides of~\eqref{eq:r3-phaseL-recurrence} to the power $1-R$ (monotone increasing):
+\[
+\varphi_{k+1} \;\leq\; \bigl(1 - \cN(2\gamma)^{R}\Delta_{k}^{R-1}\bigr)^{1-R}\,\varphi_{k}.
+\]
+Concavity gives $(1-c)^{1-R} \leq 1 - (1-R)c$ for $c \in (0,1)$, so
+\[
+\varphi_{k+1} \;\leq\; \bigl(1 - (1-R)\cN(2\gamma)^{R}\Delta_{k}^{R-1}\bigr)\,\varphi_{k} \;=\; \varphi_{k} - (1-R)\cN(2\gamma)^{R},
+\]
+where the last equality uses $\Delta_{k}^{R-1}\cdot\varphi_{k} = \Delta_{k}^{R-1}\cdot\Delta_{k}^{1-R} = 1$. Telescoping from $k_{1}$:
+\[
+\varphi_{k_{1}+K} \;\leq\; \varphi_{k_{1}} - (1-R)\cN(2\gamma)^{R}\,K.
+\]
+Since $\varphi_{k} \geq 0$ for all $k$,
+\[
+K_{3}^{L} \;\leq\; \frac{\varphi_{k_{1}}}{(1-R)\,\cN\,(2\gamma)^{R}} \;\leq\; \frac{(\Lone\delta^{2}/2)^{1-R}}{(1-R)\,\cN\,(2\gamma)^{R}},
+\]
+where we used $\varphi_{k_{1}} = \Delta_{k_{1}}^{1-R} \leq (\Lone\delta^{2}/2)^{1-R}$.
+\end{proof}
+
+\paragraph{Subcase L3: $R > 1$ (sublinear convergence).}
+
+This subcase corresponds to $p > 1$ or $q < p$.
+
+\begin{lemma}[Subcase L3]\label{lem:r3-L3}
+Suppose $x_{k} \in \bar B(\xstar, 2\delta)$ for every iterate $k$ in Phase~L, and $R > 1$. Suppose further that $\cN(2\gamma)^{R}\Delta_{k_{1}}^{R-1} < 1$. Then
+\begin{equation}\label{eq:r3-L3-bound}
+K_{3}^{L} \;\leq\; \left\lceil \frac{(2\Lone)^{R-1}}{(R-1)\,\cN\,(2\gamma)^{R}\,\epsg^{2(R-1)}} \right\rceil.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Define $\varphi_{k} := \Delta_{k}^{1-R}$. Since $1-R < 0$, the map $t \mapsto t^{1-R}$ is decreasing and convex on $(0,\infty)$. Raising both sides of~\eqref{eq:r3-phaseL-recurrence} to the power $1-R$ (decreasing, so the inequality flips):
+\[
+\varphi_{k+1} \;\geq\; \bigl(1 - \cN(2\gamma)^{R}\Delta_{k}^{R-1}\bigr)^{1-R}\,\varphi_{k}.
+\]
+Convexity gives $(1-c)^{1-R} \geq 1 - (1-R)c$ for $c \in (0,1)$, so
+\[
+\varphi_{k+1} \;\geq\; \bigl(1 - (1-R)\cN(2\gamma)^{R}\Delta_{k}^{R-1}\bigr)\,\varphi_{k} \;=\; \varphi_{k} + (R-1)\cN(2\gamma)^{R}.
+\]
+Telescoping:
+\[
+\varphi_{k_{1}+K} \;\geq\; \varphi_{k_{1}} + (R-1)\cN(2\gamma)^{R}\,K.
+\]
+The stopping criterion $\Delta_{k} \leq \epsg^{2}/(2\Lone)$ is equivalent to $\varphi_{k} \geq (2\Lone/\epsg^{2})^{R-1}$ (raising to the negative power $1-R$ flips the inequality). A sufficient condition for termination by iteration $k_{1}+K$ is therefore
+\[
+\varphi_{k_{1}} + (R-1)\cN(2\gamma)^{R}\,K \;\geq\; (2\Lone/\epsg^{2})^{R-1},
+\]
+which gives
+\[
+K \;\geq\; \frac{(2\Lone/\epsg^{2})^{R-1} - \varphi_{k_{1}}}{(R-1)\,\cN\,(2\gamma)^{R}}.
+\]
+Since $\varphi_{k_{1}} \geq 0$, dropping $-\varphi_{k_{1}}$ yields the looser but explicit upper bound~\eqref{eq:r3-L3-bound}.
+\end{proof}
+
+\begin{remark}\label{rem:r3-L3-no-delta}
+Unlike Subcases~L1 and~L2, the bound~\eqref{eq:r3-L3-bound} does not depend on $\delta$. In the sublinear regime, the dominant cost is reaching the small target tolerance~$\epsg$, not handling the entry value~$\Delta_{k_{1}}$.
+\end{remark}
+
+\subsection{Iterate confinement}\label{subsec:r3-confinement}
+\textit{[Staying in strong convexity region, and / or finding the $m^\star$.]}
+
+\subsection{Total Regime 3 bound}\label{subsec:r3-total}
+
+The total Regime~3 iteration count splits into restart and non-restart contributions:
+\[
+K_{3} \;=\; K_{3}^{\setR} + K_{3}^{\setN}, \qquad K_{3}^{\setN} = K_{3}^{H} + K_{3}^{L},
+\]
+where $K_{3}^{\setR}$ counts restart steps and $K_{3}^{\setN} = K_3^H + K_3^L$ counts non-restart steps split by the Phase~H / Phase~L analysis.
+
+\begin{lemma}[Restart-step bound]\label{lem:r3-restart}
+Suppose $x_{k} \in \bar B(\xstar, 2\delta)$ for every restart step in Regime~3, and $2\gamma\,c_{\setR} < 1$. Then
+\begin{equation}\label{eq:r3-restart-bound}
+K_{3}^{\setR} \;\leq\; \left\lceil \frac{1}{2\,\gamma\,c_{\setR}}\,\log\!\left(\frac{\Lone^{2}\,\delta^{2}}{\epsg^{2}}\right) \right\rceil.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+By~\eqref{eq:r3-decrease-R}, the restart-step recurrence is $\Delta_{k+1} \leq (1 - 2\gamma\,c_{\setR})\,\Delta_{k}$. The bound follows by the same argument as in the proof of \Cref{lem:r3-L1}, with $\cN\,\gamma$ replaced by $\gamma\,c_{\setR}$ and $\Delta_{k_{1}}$ replaced by the Regime~3 entry value $\Delta_{k_{0}} \leq \Lone\delta^{2}/2$.
+\end{proof}
+
+\begin{theorem}[Regime~3 complexity]\label{thm:regime3}
+Suppose $f$ satisfies the strict saddle property (\Cref{def:strict_saddle}) and that $x_{k} \in \bar B(\xstar, 2\delta)$ for every Regime~3 iterate. Suppose moreover that $q \leq 1+p$ and (where applicable) the smallness conditions of \Cref{lem:r3-restart}, \Cref{lem:r3-L1}, and \Cref{lem:r3-L3} hold. Then the number of iterations spent in Regime~3 by \Cref{alg:hybrid-ls} satisfies
+\begin{equation}\label{eq:K3-total}
+K_{3} \;\leq\; \underbrace{\left\lceil \frac{1}{2\,\gamma\,c_{\setR}}\,\log\!\left(\frac{\Lone^{2}\,\delta^{2}}{\epsg^{2}}\right) \right\rceil}_{K_{3}^{\setR}}
+\;+\;
+\underbrace{\left\lceil \frac{\Lone\,\delta^{2}}{2\,\cN} \right\rceil}_{K_{3}^{H}}
+\;+\;
+\underbrace{
+\begin{cases}
+\displaystyle \left\lceil \frac{1}{2\,\cN\,\gamma}\,\log\!\left(\frac{\Lone^{2}\,\delta^{2}}{\epsg^{2}}\right) \right\rceil
+& \text{if } R = 1,\\[1.2em]
+\displaystyle \left\lceil \frac{(\Lone\delta^{2}/2)^{1-R}}{(1-R)\,\cN\,(2\gamma)^{R}} \right\rceil
+& \text{if } R < 1,\\[1.2em]
+\displaystyle \left\lceil \frac{(2\Lone)^{R-1}}{(R-1)\,\cN\,(2\gamma)^{R}\,\epsg^{2(R-1)}} \right\rceil
+& \text{if } R > 1,
+\end{cases}}_{K_{3}^{L}}
+\end{equation}
+where $R := \max(1+p,\,2(1+p-q))/2$.
+\end{theorem}
+
+\begin{proof}
+Direct combination of \Cref{lem:r3-restart} for restart steps, \Cref{lem:r3-phaseH} (case~(i), valid under $q \leq 1+p$) for non-restart Phase~H steps, and whichever of \Cref{lem:r3-L1}, \Cref{lem:r3-L2}, \Cref{lem:r3-L3} applies according to the value of $R$, for non-restart Phase~L steps.
+\end{proof}
+
+\begin{corollary}[Asymptotic Regime~3 complexity]\label{cor:r3-asymptotic}
+Under the hypotheses of \Cref{thm:regime3}, as $\epsg \to 0$ with the strict-saddle parameters $(\zeta,\beta,\gamma,\delta)$ held fixed,
+\begin{equation}\label{eq:r3-asymptotic}
+K_{3} \;=\;
+\begin{cases}
+\mathcal{O}\bigl(\log(1/\epsg)\bigr) & \text{if } R = 1, \\[2pt]
+\mathcal{O}\bigl(\log(1/\epsg)\bigr) & \text{if } R < 1, \\[2pt]
+\mathcal{O}\bigl(\epsg^{-2(R-1)}\bigr) & \text{if } R > 1,
+\end{cases}
+\end{equation}
+where $R := \max(1+p,\,2(1+p-q))/2$. The constants hide dependence on $\Lone, \gamma, c_{\setR}, \cN, \delta, R$ but not on $\epsg$.
+\end{corollary}
+
+\begin{remark}[Restart steps dominate the $R<1$ case]\label{rem:r3-restart-dominates}
+For $R < 1$, the non-restart Phase~L analysis predicts a constant number of iterations, $K_{3}^{L} = \mathcal{O}(1)$. 
+However, restart steps in Regime~3 contribute $K_{3}^{\setR} = \mathcal{O}(\log(1/\epsg))$ regardless of $R$. Thus the total Regime~3 cost 
+is $\mathcal{O}(\log(1/\epsg))$, not $\mathcal{O}(1)$ as the non-restart analysis alone would suggest.
+
+The question of how often restart steps are triggered in Regime~3, and in particular, whether the restart conditions~\eqref{eq:restart} are satisfied infinitely 
+often near a strict local minimizer is algorithm- and parameter-dependent and beyond the scope of this analysis.
+\end{remark}
+
+\section{Total Complexity}\label{sec:total}
+
+We now combine the per-regime bounds of \Cref{thm:regime1,thm:regime2,thm:regime3} into a complexity bound on the total number of iterations performed by \Cref{alg:hybrid-ls}.
+
+\subsection{Disjointness of regimes}\label{subsec:total-disjoint}
+
+At each iteration $k$ before termination, the iterate $x_{k}$ falls into exactly one of the three regimes of the strict saddle decomposition (\Cref{def:strict_saddle}):
+\begin{itemize}[leftmargin=2.5em]
+  \item \emph{Regime~1}: $\norm{g_{k}} \geq \zeta$. \Cref{alg:hybrid-ls} performs an NCG step with line search.
+  \item \emph{Regime~2}: $\norm{g_{k}} < \zeta$ and $\lambda_{\min}(\hess f(x_{k})) \leq -\beta$. \Cref{alg:hybrid-ls} performs a negative-curvature step.
+  \item \emph{Regime~3}: $\norm{g_{k}} < \zeta$ and $\lambda_{\min}(\hess f(x_{k})) > -\beta$. The iterate lies in the strong-convexity neighborhood of a local minimizer.
+\end{itemize}
+Denote by $K_{1}$, $K_{2}$, $K_{3}$ the number of iterations spent in each regime. The total iteration count of the algorithm is
+\begin{equation}\label{eq:K-total-decomp}
+K_{\mathrm{total}} \;=\; K_{1} + K_{2} + K_{3}.
+\end{equation}
+
+\subsection{Total complexity bound}\label{subsec:total-bound}
+
+\begin{theorem}[Total complexity]\label{thm:total}
+Let \Cref{ass:smooth} and \Cref{ass:lb} hold, and let $f$ satisfy the $(\zeta, \beta, \gamma, \delta)$-strict saddle property (\Cref{def:strict_saddle}). Suppose:
+\begin{enumerate}[label=(\roman*), leftmargin=2.5em]
+  \item the algorithm parameters satisfy $1 + p - q \geq 0$ and $q \leq 1+p$;
+  \item the tolerances satisfy $\epsg \leq \zeta$ and $\epsH \leq \beta$;
+  \item the iterates remain in $\bar B(\xstar, 2\delta)$ throughout Regime~3;
+  \item the smallness conditions of \Cref{lem:r3-restart}, \Cref{lem:r3-L1}, and \Cref{lem:r3-L3} hold where applicable.
+\end{enumerate}
+Then the total number of iterations performed by \Cref{alg:hybrid-ls} satisfies
+\begin{equation}\label{eq:K-total}
+K_{\mathrm{total}} \;\leq\; K_{1} + K_{2} + K_{3},
+\end{equation}
+where $K_{1}, K_{2}, K_{3}$ are bounded as in \Cref{thm:regime1}, \Cref{thm:regime2}, and \Cref{thm:regime3}, respectively.
+\end{theorem}
+
+\begin{proof}
+By the partition above, every iteration before termination falls into exactly one regime. Summing the per-regime bounds of \Cref{thm:regime1,thm:regime2,thm:regime3} gives~\eqref{eq:K-total}.
+\end{proof}
+
+\subsection{Asymptotic behavior}\label{subsec:total-asymptotic}
+
+The bound~\eqref{eq:K-total} is best understood asymptotically. The per-regime rates are:
+\begin{itemize}[leftmargin=2.5em]
+  \item $K_{1} = \mathcal{O}\bigl(\zeta^{-\max\{1+p,\,2(1+p-q)\}}\bigr) = \mathcal{O}\bigl(\zeta^{-2R}\bigr)$ (from \Cref{thm:regime1}, since $\zeta \leq 1$).
+  \item $K_{2} = \mathcal{O}\bigl(\beta^{-3}\bigr)$ (from \Cref{thm:regime2}).
+  \item $K_{3}$ as in \Cref{cor:r3-asymptotic}.
+\end{itemize}
+Under the strict-saddle framing, $\zeta, \beta, \gamma, \delta$ are properties of the function (fixed by the strict saddle decomposition), while $\epsg$ is the user-chosen tolerance scaling toward~$0$. The asymptotic complexity in $\epsg$ is therefore governed by $K_{3}$ alone, since $K_{1}$ and $K_{2}$ are independent of $\epsg$.
+
+\begin{corollary}[Asymptotic total complexity]\label{cor:total-asymptotic}
+Fix a function $f$ satisfying the $(\zeta, \beta, \gamma, \delta)$-strict saddle property, so that $\zeta, \beta, \gamma, \delta$ are absolute constants of the problem. Under the hypotheses of \Cref{thm:total}, as $\epsg \to 0$ with $\zeta, \beta, \gamma, \delta$ held fixed,
+\begin{equation}\label{eq:total-asymptotic}
+K_{\mathrm{total}} \;=\;
+\begin{cases}
+\mathcal{O}\bigl(\log(1/\epsg)\bigr) & \text{if } R \leq 1, \\[2pt]
+\mathcal{O}\bigl(\epsg^{-2(R-1)}\bigr) & \text{if } R > 1,
+\end{cases}
+\end{equation}
+where $R := \max(1+p,\,2(1+p-q))/2$. The constants hide dependence on $(\zeta, \beta, \gamma, \delta)$ and on the algorithm and Lipschitz parameters, but not on $\epsg$.
+\end{corollary}
+
+\begin{remark}[The role of restart steps in Regime~3]\label{rem:total-r3-restart}
+The case $R < 1$ deserves particular attention. The non-restart Phase~L analysis predicts a constant number of iterations, which would suggest $K_{3} = \mathcal{O}(1)$ and a total complexity dominated by $K_{1} + K_{2}$ (independent of $\epsg$). However, restart steps in Regime~3 contribute $K_{3}^{\setR} = \mathcal{O}(\log(1/\epsg))$ regardless of $R$, and as long as restart steps are triggered in Regime~3, they set a logarithmic floor on the total complexity. This is reflected in~\eqref{eq:total-asymptotic} by merging the $R = 1$ and $R < 1$ cases into a single $\mathcal{O}(\log(1/\epsg))$ rate.
+\end{remark}
+
+\begin{remark}[The role of Regime~3]\label{rem:total-r3-role}
+\Cref{cor:total-asymptotic} reveals the qualitative impact of the strong-convexity phase: although the algorithm performs work in all three regimes, only Regime~3 produces an $\epsg$-dependent contribution. In the favorable parameter regime ($R \leq 1$), this contribution is logarithmic, so the algorithm achieves an asymptotic complexity of $\mathcal{O}(\log(1/\epsg))$ on top of the saddle-escape cost $K_{1} + K_{2}$. In the unfavorable regime ($R > 1$), the local-minimizer phase becomes the dominant cost, with sublinear rate $\mathcal{O}(\epsg^{-2(R-1)})$.
+\end{remark}
+
+\begin{remark}[Two distinct asymptotic regimes]\label{rem:total-asymptotic-regimes}
+\Cref{cor:total-asymptotic} treats $\zeta, \beta, \gamma, \delta$ as fixed properties of the function $f$ and lets only the user-chosen tolerance $\epsg$ scale toward $0$. This is the natural regime under the strict saddle assumption, where the function-class parameters are intrinsic to $f$.
+
+A second possible regime couples $\zeta$ to $\epsg$ and $\beta$ to $\epsH$ (e.g., $\zeta = \epsg$ and $\beta = \epsH$). In that regime, $K_{1}$ and $K_{2}$ contribute $\epsg$- and $\epsH$-dependent terms ($\mathcal{O}(\epsg^{-2R})$ and $\mathcal{O}(\epsH^{-3})$ respectively), and the dominant term is the worst of the three. Our framing is the strict-saddle framing; the second regime is not the subject of this paper.
+\end{remark}
+
+
+
+\section{Discussion}\label{sec:discussion}
+
+
+\textit{[Comparison with fixed-stepsize results, limitations of proof techniques ?]}
+
+
+\appendix
+\section{Auxiliary results}\label{app:aux}
+
+\textit{[If needed: technical lemmas, etc]}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
