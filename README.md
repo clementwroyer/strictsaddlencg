@@ -21,6 +21,8 @@ Starting point: [Paper by Chan--Renous-Legoubin and Royer on nonlinear CG (NCG) 
 - More on the theorem by the same EPFL group: [On center-stable theorem](https://scholar.google.com/citations?view_op=view_citation&hl=fr&user=o6tPrZAAAAAJ&sortby=pubdate&citation_for_view=o6tPrZAAAAAJ:NhqRSupF_l8C)
 - Advanced results show complexity bounds for perturbed variants of gradient descent [How to escape saddle points efficiently](https://proceedings.mlr.press/v70/jin17a.html). See also [A practical randomized trust-region method to escape saddle points in high dimension](https://arxiv.org/abs/2603.15494) for a recent work by the Boumal group on such results in the context of trust-region methods and [Understanding the Implicit Regularization of Gradient Descent in Over-parameterized Models](https://arxiv.org/abs/2505.17304?) for an alternate perturbation technique.
 
+- [A view of nonlinear CG (Fletcher/Reeves) as discretization of a dynamical system](https://link.springer.com/article/10.1007/s00466-020-01849-7)
+
 *Step 2.1. Adapt the GD analysis to show that NCG also escapes saddle points (with fixed stepsize).*
 
 *Step 2.2. Study the line-search paper to show that NCG with line search also escapes saddle points.*
