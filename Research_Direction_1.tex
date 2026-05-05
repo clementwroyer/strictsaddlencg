@@ -6,6 +6,7 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepackage{xcolor}
+\usepackage{enumitem}
 
 \definecolor{colorR1finite}{RGB}{250,236,231}
 \definecolor{colorMiddle}{RGB}{225,245,238}
@@ -290,504 +291,337 @@ Since all terms are positive, each is individually bounded by $\Delta_0$. Summin
 The bound~\eqref{eq:bound_arbitrary} is conservative because each group uses the full budget $\Delta_0$ independently. The NCG terms match those of Theorem~3.1 in~\cite{RoyerChan2022} (up to constants due to the absence of line search), while the NCD term follows from~\cite{WrightMa2022}.
 \end{remark}
 
-% -------------------- SECTION 5 - STRICT SADDLE FUNCTION - THE HEART OF THE ANALYSIS --------------------
+% ---------------------------------------------------------------
+%  Section 5 — Complexity on Strict Saddle Functions
+% ---------------------------------------------------------------
 
 \section{Complexity on Strict Saddle Functions}
 \label{sec:strict_saddle}
 
-We now specialize to functions satisfying the strict saddle property, which provides additional structure near stationary points.
+We now specialize to functions satisfying the strict saddle property,
+which provides additional structure near stationary points and allows a
+finer complexity analysis than the generic nonconvex setting of
+Section~\ref{sec:arbitrary}.
 
+% -------------------------------------------------------------------
 \subsection{The strict saddle property}
+% -------------------------------------------------------------------
 
 \begin{definition}[\cite{GeSaddle15}]
 \label{def:strict_saddle}
-A function $f$ is $(\zeta, \beta, \gamma, \delta)$-strict saddle if, for any $x \in \mathbb{R}^n$, at least one of the following holds:
+A differentiable function $f:\mathbb{R}^n\to\mathbb{R}$ is
+$(\zeta,\beta,\gamma,\delta)$-\emph{strict saddle} if, for every
+$x\in\mathbb{R}^n$, at least one of the following holds:
 \begin{enumerate}
-    \item \textbf{(Large gradient)} $\|\nabla f(x)\| \geq \zeta$,
-    \item \textbf{(Negative curvature)} $\lambda_{\min}(\nabla^2 f(x)) \leq -\beta$,
-    \item \textbf{(Near a local minimizer)} There exists a local minimizer $x^\star$ with $\|x - x^\star\| \leq \delta$, and $f$ restricted to $\{x' : \|x' - x^\star\| \leq 2\delta\}$ is $\gamma$-strongly convex.
+  \item \textbf{(Large gradient)}\quad $\|\nabla f(x)\|\geq\zeta$,
+  \item \textbf{(Negative curvature)}\quad
+        $\lambda_{\min}(\nabla^2 f(x))\leq-\beta$,
+  \item \textbf{(Near a local minimizer)}\quad there exists a local
+        minimizer $x^\star$ with $\|x-x^\star\|\leq\delta$, and
+        $f\!\restriction_{B(x^\star,2\delta)}$ is $\gamma$-strongly convex.
 \end{enumerate}
 \end{definition}
 
-Setting $\varepsilon_g \leq \zeta$ and $\varepsilon_H \leq \beta$ in Algorithm~\ref{algo:hybrid} ensures that upon termination, condition~(3) holds: the output is near a local minimizer. The three conditions define three regimes, which we analyze separately.
+Setting $\varepsilon_g\leq\zeta$ and $\varepsilon_H\leq\beta$ in
+Algorithm~\ref{algo:hybrid} ensures that, upon termination,
+condition~(3) holds: the output lies near a local minimizer. The three
+conditions define three mutually exclusive \emph{regimes} at each
+iterate, which we analyze separately.
 
-\paragraph{Notation.} We partition the iteration indices $\{0, \ldots, K-1\}$ into five disjoint sets:
-\begin{center}
-\begin{tabular}{lll}
-$\mathcal{N}^1$: & non-restarted in Regime 1 & ($|\mathcal{N}^1| = K^1_{\mathcal{N}}$) \\
-$\mathcal{R}^1$: & restarted in Regime 1 & ($|\mathcal{R}^1| = K^1_{\mathcal{R}}$) \\
-$\mathcal{H}$: & negative curvature in Regime 2 & ($|\mathcal{H}| = K^2$) \\
-$\mathcal{N}^3$: & non-restarted in Regime 3 & ($|\mathcal{N}^3| = K^3_{\mathcal{N}}$) \\
-$\mathcal{R}^3$: & restarted in Regime 3 & ($|\mathcal{R}^3| = K^3_{\mathcal{R}}$)
-\end{tabular}
-\end{center}
-The total iteration count is $K = K^1_{\mathcal{N}} + K^1_{\mathcal{R}} + K^2 + K^3_{\mathcal{N}} + K^3_{\mathcal{R}}$.
+\paragraph{Notation.}
+Let $K^j_{\mathcal{R}}$ and $K^j_{\mathcal{N}}$ denote the number
+of restarted and non-restarted NCG iterations in Regime~$j$
+respectively, $K^2$ the number of negative curvature iterations,
+and $K = K^1_{\mathcal{R}} + K^1_{\mathcal{N}} + K^2 +
+K^3_{\mathcal{R}} + K^3_{\mathcal{N}}$ the total iteration count.
+We write $\Delta_k := f(x_k) - f(x^\star)$ for the suboptimality
+at iterate $k$, where $x^\star$ denotes the local minimizer
+associated with the current regime. Since all per-iteration
+decreases are non negative and telescope to at most $\Delta_0$, each
+regime's iteration count is bounded by dividing $\Delta_0$ by the
+minimum per-iteration decrease in that regime.
 
-All iterations draw from the single decrease budget $\Delta_0$:
-\begin{equation}
-\label{eq:budget}
-\begin{split}
-    \Delta f \geq{} &\sum_{k \in \mathcal{N}^1}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{R}^1}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{H}}(f(x_k) - f(x_{k+1})) \\
-    &+ \sum_{k \in \mathcal{N}^3}(f(x_k) - f(x_{k+1})) + \sum_{k \in \mathcal{R}^3}(f(x_k) - f(x_{k+1})).
-\end{split}
-\end{equation}
-We define the \emph{decrease consumed} in each regime as the sum of per-iteration decreases over all iterations belonging to that regime:
-\[
-\Delta f^1 := \sum_{k \in \mathcal{N}^1 \cup \mathcal{R}^1}(f(x_k) - f(x_{k+1})), \qquad \Delta f^2 := \sum_{k \in \mathcal{H}}(f(x_k) - f(x_{k+1})), \qquad \Delta f^3 := \sum_{k \in \mathcal{N}^3 \cup \mathcal{R}^3}(f(x_k) - f(x_{k+1})),
-\]
-so that $\Delta f^1 + \Delta f^2 + \Delta f^3 \leq \Delta f$. Note that $\Delta f^j$ is not the suboptimality at entry to regime $j$, but the total amount of function decrease accumulated during all iterations spent in regime~$j$. In particular, since the algorithm may visit regimes in any order, the iterations within each regime need not be contiguous.
+% -------------------------------------------------------------------
+\subsection{Regime 1: Large gradient ($\|g_k\|\geq\zeta$)}
+% -------------------------------------------------------------------
 
-For Regime~3, however, the monotone decrease property (Remark~\ref{rem:monotone}) together with the analysis in Section~\ref{subsec:regime3} guarantees that once the algorithm enters Regime~3 at some iteration $k_0$, it stays there. In this case, $\Delta f^3 = f(x_{k_0}) - f(x_K)$, where $K$ is the final iteration. Since $f(x_K) \geq f(x^\star)$:
-\[
-\Delta f^3 \leq f(x_{k_0}) - f(x^\star) \leq \frac{L_1}{2}\delta^2,
-\]
-where the last inequality follows from~\eqref{eq:entry_gap}. This trajectory-independent upper bound on $\Delta f^3$ is what allows $\delta$ to appear in the Regime~3 complexity bounds.
-
-\subsection{Regime 1: Large gradient ($\|g_k\| \geq \zeta$)}
-
-The per-iteration decrease bounds from Lemmas~\ref{lem:decrease_N} and~\ref{lem:decrease_R} give:
-\[
-K^1_{\mathcal{R}} \leq \frac{\Delta f^1}{c_{\mathcal{R}}\,\zeta^2}, \qquad K^1_{\mathcal{N}} \leq \frac{\Delta f^1}{c_{\mathcal{N}}\,\zeta^{2(1+p-q)}}.
-\]
-Since $\Delta f^1 \leq \Delta f$:
+In Regime~1, every iterate satisfies $\|g_k\|\geq\zeta$.
+Lemmas~\ref{lem:decrease_R} and~\ref{lem:decrease_N} give minimum
+per-iteration decreases of $c_{\mathcal{R}}\zeta^2$ and
+$c_{\mathcal{N}}\zeta^{2(1+p-q)}$ for restarted and non-restarted
+iterations respectively. Telescoping against $\Delta_0$:
 \begin{equation}
 \label{eq:regime1}
-K^1 = K^1_{\mathcal{R}} + K^1_{\mathcal{N}} \leq \frac{\Delta f}{c_{\mathcal{R}}}\,\zeta^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\zeta^{-2(1+p-q)}.
+K^1 \;=\; K^1_{\mathcal{R}}+K^1_{\mathcal{N}}
+\;\leq\;
+\frac{\Delta_0}{c_{\mathcal{R}}}\,\zeta^{-2}
+\;+\;
+\frac{\Delta_0}{c_{\mathcal{N}}}\,\zeta^{-2(1+p-q)}.
 \end{equation}
 
-\subsection{Regime 2: Negative curvature ($\lambda_{\min}(\nabla^2 f(x_k)) \leq -\beta$)}
+% -------------------------------------------------------------------
+\subsection{Regime 2: Negative curvature
+            ($\lambda_{\min}(\nabla^2 f(x_k))\leq-\beta$)}
+% -------------------------------------------------------------------
 
-From Lemma~\ref{lem:decrease_NCD} and $\Delta f^2 \leq \Delta f$:
+In Regime~2, every iterate satisfies
+$\lambda_{\min}(\nabla^2 f(x_k))\leq-\beta$.
+Lemma~\ref{lem:decrease_NCD} guarantees a minimum per-iteration
+decrease of $2\beta^3/(3L_2^2)$. Telescoping against $\Delta_0$:
 \begin{equation}
 \label{eq:regime2}
-K^2 \leq \frac{3L_2^2\,\Delta f}{2\beta^3}.
+K^2 \;\leq\; \frac{3L_2^2\,\Delta_0}{2\beta^3}.
 \end{equation}
 
+% -------------------------------------------------------------------
 \subsection{Regime 3: Near a local minimizer}
 \label{subsec:regime3}
+% -------------------------------------------------------------------
 
-This is where $\|x_k - x^\star\| \leq \delta$ and $f$ is $\gamma$-strongly convex in the $2\delta$-neighborhood. Both~\eqref{eq:smooth_upper} and~\eqref{eq:PL} hold. The parameter $\delta$ controls the initial suboptimality upon entering this regime.
+Throughout this section we assume $x_k\in B(x^\star,\delta)$ and
+that $f$ is $\gamma$-strongly convex in $B(x^\star,2\delta)$. Both
+the smoothness upper bound~\eqref{eq:smooth_upper} and the PL
+inequality~\eqref{eq:PL} are available. We write
+$\Delta_k:=f(x_k)-f(x^\star)$ for the suboptimality at iterate $k$.
 
-\subsubsection{Entry condition and the role of $\delta$}
-\label{subsubsec:entry}
-
-At the first iteration $k_0$ in Regime~3, the strict saddle property (Definition~\ref{def:strict_saddle}, condition 3) guarantees $\|x_{k_0} - x^\star\| \leq \delta$ for some local minimizer $x^\star$. We now derive bounds on the suboptimality gap $\Delta f^3 := f(x_{k_0}) - f(x^\star)$ and the gradient norm $\|g_{k_0}\|$ in terms of $\delta$.
-
-\paragraph{Upper bound on the suboptimality gap.} Since $\nabla f$ is $L_1$-Lipschitz (A1), the descent lemma~\eqref{eq:descent_lemma} gives, for any $x, y \in \mathbb{R}^n$:
-\[
-f(y) \leq f(x) + \nabla f(x)^T(y - x) + \frac{L_1}{2}\|y - x\|^2.
-\]
-Setting $x = x^\star$ and $y = x_{k_0}$, and using $\nabla f(x^\star) = 0$ (since $x^\star$ is a local minimizer):
-\[
-f(x_{k_0}) \leq f(x^\star) + 0 + \frac{L_1}{2}\|x_{k_0} - x^\star\|^2 \leq f(x^\star) + \frac{L_1}{2}\delta^2.
-\]
-Therefore:
-\begin{equation}
-\label{eq:entry_upper}
-\Delta f^3 = f(x_{k_0}) - f(x^\star) \leq \frac{L_1}{2}\delta^2.
-\end{equation}
-
-\paragraph{Lower bound on the suboptimality gap.} Since $f$ is $\gamma$-strongly convex in $B(x^\star, 2\delta)$ and $x_{k_0} \in B(x^\star, \delta) \subset B(x^\star, 2\delta)$:
-\[
-f(x_{k_0}) \geq f(x^\star) + \nabla f(x^\star)^T(x_{k_0} - x^\star) + \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 = f(x^\star) + \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2,
-\]
-where we again used $\nabla f(x^\star) = 0$. Therefore:
-\begin{equation}
-\label{eq:entry_lower}
-\Delta f^3 = f(x_{k_0}) - f(x^\star) \geq \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2.
-\end{equation}
-Combining~\eqref{eq:entry_upper} and~\eqref{eq:entry_lower}:
-\begin{equation}
-\label{eq:entry_gap}
-\frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 \leq \Delta f^3 \leq \frac{L_1}{2}\delta^2.
-\end{equation}
-
-\paragraph{Upper bound on the gradient norm.} From the smoothness inequality~\eqref{eq:smooth_upper}, which states $\|\nabla f(x)\|^2 \leq 2L_1(f(x) - f(x^\star))$ 
-for any $x$ near $x^\star$, we have:
-\[
-\|g_{k_0}\|^2 \leq 2L_1(f(x_{k_0}) - f(x^\star)).
-\]
-Substituting the upper bound~\eqref{eq:entry_upper} on $\Delta f^3$:
-\[
-\|g_{k_0}\|^2 \leq 2L_1 \cdot \frac{L_1}{2}\delta^2 = L_1^2\delta^2.
-\]
-Taking square roots:
-\begin{equation}
-\label{eq:entry_grad_upper}
-\|g_{k_0}\| \leq L_1\delta.
-\end{equation}
-
-\paragraph{Lower bound on the gradient norm.} From the Polyak--\L{}ojasiewicz inequality~\eqref{eq:PL}, which states \\
- $\|\nabla f(x)\|^2 \geq 2\gamma(f(x) - f(x^\star))$, 
-and the lower bound~\eqref{eq:entry_lower}:
-\[
-\|g_{k_0}\|^2 \geq 2\gamma(f(x_{k_0}) - f(x^\star)) \geq 2\gamma \cdot \frac{\gamma}{2}\|x_{k_0} - x^\star\|^2 = \gamma^2\|x_{k_0} - x^\star\|^2.
-\]
-Taking square roots:
-\begin{equation}
-\label{eq:entry_grad_lower}
-\|g_{k_0}\| \geq \gamma\|x_{k_0} - x^\star\|.
-\end{equation}
-
-\subsubsection{Non-restarted iterations in Regime 3 ($k \in \mathcal{N}^3$) Using Potential Function Proof}
-
-\paragraph{Step 1: Combine decrease lemma with PL inequality.} Lemma~\ref{lem:decrease_N} gives:
-\[
-f(x_k) - f(x_{k+1}) \geq c_{\mathcal{N}}\|g_k\|^{2r}, \qquad r := 1 + p - q.
-\]
-The PL inequality~\eqref{eq:PL} states $\|g_k\|^2 \geq 2\gamma(f(x_k) - f(x^\star))$. Substituting:
-\[
-f(x_k) - f(x_{k+1}) \geq c_{\mathcal{N}}\left(2\gamma(f(x_k) - f(x^\star))\right)^r.
-\]
-Let $C := c_{\mathcal{N}}(2\gamma)^r = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$. Then:
-\begin{equation}
-\label{eq:decrease_N3}
-f(x_k) - f(x_{k+1}) \geq C(f(x_k) - f(x^\star))^r.
-\end{equation}
-
-\paragraph{Step 2: Transform to a bound on $f(x_{k+1}) - f(x^\star)$.} Rearranging~\eqref{eq:decrease_N3}:
-\begin{equation}
-\label{eq:contraction_N3}
-f(x_{k+1}) - f(x^\star) \leq (f(x_k) - f(x^\star)) - C(f(x_k) - f(x^\star))^r = (f(x_k) - f(x^\star))\left(1 - C(f(x_k) - f(x^\star))^{r-1}\right).
-\end{equation}
-
-We also need to relate the stopping criterion $\|g_k\| \leq \varepsilon_g$ to a condition on $f(x_k) - f(x^\star)$. The smoothness bound~\eqref{eq:smooth_upper} gives $\|g_k\|^2 \leq 2L_1(f(x_k) - f(x^\star))$, so $\|g_k\| \leq \varepsilon_g$ is guaranteed when $f(x_k) - f(x^\star) \leq \varepsilon_g^2/(2L_1)$. We therefore set:
+The gradient stopping criterion $\|g_k\|\leq\varepsilon_g$ is
+equivalent to requiring $\Delta_k\leq\varepsilon$ via the smoothness
+bound~\eqref{eq:smooth_upper}, where we set:
 \begin{equation}
 \label{eq:eps_convert}
-\varepsilon := \frac{\varepsilon_g^2}{2L_1},
+\varepsilon \;:=\; \frac{\varepsilon_g^2}{2L_1}.
 \end{equation}
-and the stopping criterion becomes $f(x_k) - f(x^\star) \leq \varepsilon$.
+This conversion is used throughout the analysis of Regime~3.
 
-We now analyze three cases depending on $r$.
+% -------------------------------------------------------------------
+\subsubsection{Entry conditions and the role of $\delta$}
+\label{subsubsec:entry}
+% -------------------------------------------------------------------
 
-\paragraph{Step 3: Case 1, $r = 1$ ($p = q$).} The recursion~\eqref{eq:contraction_N3} becomes:
-\[
-f(x_{k+1}) - f(x^\star) \leq (1 - C)(f(x_k) - f(x^\star)).
-\]
-Since $C = \frac{\sigma^2(2\gamma)}{2L_1\kappa^2} < 1$, this is a geometric contraction. Iterating $K$ times:
-\[
-f(x_K) - f(x^\star) \leq (1 - C)^K(f(x_{k_0}) - f(x^\star)).
-\]
-Requiring $f(x_K) - f(x^\star) \leq \varepsilon$:
-\[
-(1 - C)^K \leq \frac{\varepsilon}{f(x_{k_0}) - f(x^\star)}.
-\]
-Taking logarithms. Since $1 - C < 1$, $\log(1 - C) < 0$, so dividing flips the inequality:
-\[
-K \geq \frac{\log\left(\frac{\varepsilon}{f(x_{k_0}) - f(x^\star)}\right)}{\log(1 - C)} = \frac{\log\left(\frac{f(x_{k_0}) - f(x^\star)}{\varepsilon}\right)}{-\log(1 - C)}.
-\]
-Using $-\log(1 - C) \geq C$ for $C \in (0,1)$, and $\Delta f^3 = f(x_{k_0}) - f(x^\star) \leq \frac{L_1}{2}\delta^2$:
-\[
-K \geq \frac{1}{C}\log\frac{\Delta f^3}{\varepsilon}.
-\]
-Substituting $C = \frac{\sigma^2(2\gamma)}{2L_1\kappa^2}$ and $\varepsilon = \frac{\varepsilon_g^2}{2L_1}$:
+At the first Regime-3 iterate $k_0$, the strict saddle property
+gives $\|x_{k_0}-x^\star\|\leq\delta$. Applying the descent lemma
+from $x^\star$ with $\nabla f(x^\star)=0$:
 \begin{equation}
-\label{eq:N3_r1}
-K^3_{\mathcal{N},\, p=q} \leq \frac{L_1\kappa^2}{\sigma^2\gamma}\log\frac{L_1^2\delta^2}{\varepsilon_g^2}.
+\label{eq:entry_upper}
+\Delta_{k_0} \;\leq\; \tfrac{L_1}{2}\delta^2.
 \end{equation}
-
-\paragraph{Step 4: Case 2, $r > 1$ ($p > q$, sublinear rate).} From~\eqref{eq:contraction_N3}:
-\[
-f(x_{k+1}) - f(x^\star) \leq (f(x_k) - f(x^\star))\left(1 - C(f(x_k) - f(x^\star))^{r-1}\right).
-\]
-We first verify that $x := C(f(x_k) - f(x^\star))^{r-1} \in (0,1)$. Positivity is clear ($C > 0$ and $f(x_k) > f(x^\star)$). If $x \geq 1$, the right-hand side is $\leq 0$, giving $f(x_{k+1}) \leq f(x^\star)$. But since $x_{k+1} \in B(x^\star, 2\delta)$ where $f$ is strongly convex, $f(x_{k+1}) \geq f(x^\star)$. Therefore $f(x_{k+1}) = f(x^\star)$: the algorithm has already converged. So for a non-terminated run, $x \in (0,1)$.
-
-Define the potential function $\phi_k := (f(x_k) - f(x^\star))^{1-r}$, where $1 - r < 0$. Raising both sides of~\eqref{eq:contraction_N3} to the power $1 - r < 0$ flips the inequality:
-\[
-\phi_{k+1} \geq (1 - C\phi_k^{-1})^{1-r}\,\phi_k.
-\]
-Using the inequality $(1 - x)^{1-r} \geq 1 + (r-1)x$ for $x \in (0,1)$:
-\begin{align*}
-\phi_{k+1} &\geq \phi_k\left(1 + (r-1)C\,\phi_k^{-1}\right) = \phi_k + (r-1)C.
-\end{align*}
-Telescoping over $K^3_{\mathcal{N}}$ non-restarted iterations:
-\[
-\phi_K \geq \phi_0 + K^3_{\mathcal{N}}(r-1)C.
-\]
-Requiring $f(x_K) - f(x^\star) \leq \varepsilon$. Since $1 - r < 0$, this gives $\phi_K = (f(x_K) - f(x^\star))^{1-r} \geq \varepsilon^{1-r}$. So we need:
-\[
-\phi_0 + K^3_{\mathcal{N}}(r-1)C \geq \varepsilon^{1-r},
-\]
-hence:
-\[
-K^3_{\mathcal{N}} \leq \frac{\varepsilon^{1-r} - \phi_0}{(r-1)C}.
-\]
-Substituting $\phi_0 = (\Delta f^3)^{1-r} \geq (L_1\delta^2/2)^{1-r}$, $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$, and $\varepsilon = \frac{\varepsilon_g^2}{2L_1}$:
+Strong convexity at $x_{k_0}$ gives the matching lower bound:
 \begin{equation}
-\label{eq:N3_r_big}
-K^3_{\mathcal{N},\, p>q} \leq \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^{1+p-q}(p-q)}\left(\left(\frac{\varepsilon_g^2}{2L_1}\right)^{q-p} - \left(\frac{L_1\delta^2}{2}\right)^{q-p}\right).
+\label{eq:entry_lower}
+\Delta_{k_0} \;\geq\; \tfrac{\gamma}{2}\|x_{k_0}-x^\star\|^2.
 \end{equation}
-
-\paragraph{Step 5: Case 3, $r < 1$ ($p < q$, finite termination).} From~\eqref{eq:contraction_N3}:
-\[
-f(x_{k+1}) - f(x^\star) \leq (f(x_k) - f(x^\star))\left(1 - C(f(x_k) - f(x^\star))^{r-1}\right).
-\]
-Define the potential function $\phi_k := (f(x_k) - f(x^\star))^{1-r}$, where $1 - r > 0$. Raising both sides of~\eqref{eq:contraction_N3} to the power $1 - r > 0$ preserves the inequality:
-\[
-\phi_{k+1} \leq (1 - C\phi_k^{-1})^{1-r}\,\phi_k.
-\]
-Using the inequality $(1 - x)^{1-r} \geq 1 + (r-1)x$ for $x \in (0,1)$:
-\begin{align*}
-\phi_{k+1} &\leq \phi_k\left(1 + (r-1)C\,\phi_k^{-1}\right) = \phi_k + (r-1)C.
-\end{align*}
-Since $r - 1 < 0$, this reads $\phi_{k+1} \leq \phi_k - (1-r)C$, i.e., $\phi_k$ decreases by a fixed amount at each iteration.
-
-Telescoping over $K^3_{\mathcal{N}}$ non-restarted iterations:
-\[
-\phi_K \leq \phi_0 - K^3_{\mathcal{N}}(1-r)C.
-\]
-Since $\phi_K = (f(x_K) - f(x^\star))^{1-r} \geq 0$ (a nonnegative quantity raised to a positive power):
-\[
-0 \leq \phi_0 - K^3_{\mathcal{N}}(1-r)C \implies K^3_{\mathcal{N}} \leq \frac{\phi_0}{(1-r)C}.
-\]
-At $K^\star = \lfloor \frac{\phi_0}{(1-r)C} \rfloor$, the recursion requires $\phi_{K^\star} \leq 0$. Since $\phi_{K^\star} \geq 0$, the only possibility is $\phi_{K^\star} = 0$, which implies $f(x_{K^\star}) = f(x^\star)$ exactly.
-
-Substituting $\phi_0 = (\Delta f^3)^{1-r} \leq (L_1\delta^2/2)^{1-r}$ and $C = \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$:
+Combining with~\eqref{eq:smooth_upper} and~\eqref{eq:PL}:
 \begin{equation}
-\label{eq:N3_r_small}
-K^3_{\mathcal{N},\, p<q} \leq \left(\frac{L_1\delta^2}{2}\right)^{q-p}\frac{2L_1\kappa^2}{\sigma^2(2\gamma)^{1+p-q}(q-p)}.
+\label{eq:entry_grad}
+\gamma\|x_{k_0}-x^\star\| \;\leq\; \|g_{k_0}\| \;\leq\; L_1\delta.
 \end{equation}
-This bound is independent of $\varepsilon_g$: the algorithm reaches the exact minimizer in finitely many non-restarted steps.
 
-\subsubsection{Non-restarted iterations in Regime 3 ($k \in \mathcal{N}^3$) With (1-C) Proof}
+% -------------------------------------------------------------------
+\subsubsection{Restarted iterations in Regime 3
+               ($k\in\mathcal{R}^3$)}
+% -------------------------------------------------------------------
 
-\paragraph{Step 1: Per-iteration decrease via descent lemma.}
-By the descent lemma~\eqref{eq:descent_lemma}, using the non-restarted 
-conditions $g_k^Td_k \leq -\sigma\|g_k\|^{1+p}$ and $\|d_k\| \leq \kappa\|g_k\|^q$:
-\[
-f(x_k - \alpha g_k) \leq f(x_k) - \left(\alpha - \frac{L_1\alpha^2}{2}\right)\|g_k\|^2.
-\]
-Applying the PL inequality~\eqref{eq:PL}, $\|g_k\|^2 \geq 2\gamma(f(x_k) - f(x^\star))$:
-\[
-f(x_k - \alpha g_k) \leq f(x_k) - \left(\alpha - \frac{L_1\alpha^2}{2}\right) 
-2\gamma(f(x_k) - f(x^\star)).
-\]
-Hence, letting $\Delta_k := f(x_k) - f(x^\star)$:
+For restarted iterations $d_k=-g_k$ with stepsize $\alpha=1/L_1$,
+the descent lemma and PL inequality give the standard gradient-descent
+contraction:
 \begin{equation}
-\label{eq:descent_R3_N}
-\Delta_{k+1} \leq \left(1 - 2\gamma\left(\alpha - \frac{L_1\alpha^2}{2}\right)\right)\Delta_k.
+\label{eq:R3_decrease}
+\Delta_{k+1} \;\leq\; \Bigl(1-\frac{\gamma}{L_1}\Bigr)\Delta_k.
 \end{equation}
-The contraction factor $C = 2\gamma\!\left(\alpha - \frac{L_1\alpha^2}{2}\right)$ 
-depends on the stepsize $\alpha$. We now compute it for restarted 
-and non-restarted stepsizes separately.
-
-\paragraph{Step 2: Computing $C_{\mathcal{N}}$ for non-restarted iterations.}
-Substituting the optimal non-restarted stepsize 
-$\alpha^\star_{\mathcal{N}} = \frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$:
-\begin{align*}
-2\gamma\!\left(\alpha^\star_{\mathcal{N}} - \frac{L_1(\alpha^\star_{\mathcal{N}})^2}{2}\right)
-&= 2\gamma\!\left(\frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q} 
-   - \frac{L_1}{2}\cdot\frac{\sigma^2}{L_1^2\kappa^4}\|g_k\|^{2(1+p-2q)}\right) \\
-&= 2\gamma\left(\frac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q} 
-   - \frac{\sigma^2}{2L_1\kappa^4}\|g_k\|^{2(1+p-2q)}\right) \\
-&= 2\gamma\|g_k\|^{1+p-2q}\left(\frac{\sigma}{L_1\kappa^2} 
-   - \frac{\sigma^2}{2L_1\kappa^4}\|g_k\|^{1+p-2q}\right) \\
-&= \frac{2\gamma\sigma}{L_1\kappa^2}\|g_k\|^{s}
-   \left(1 - \frac{\sigma}{2\kappa^2}\|g_k\|^{s}\right),
-\end{align*}
-where $s := 1+p-2q$. We define:
+Telescoping and requiring $\Delta_K\leq\varepsilon_g^2/(2L_1)$:
 \begin{equation}
-\label{eq:C_N}
-C_{\mathcal{N},k} := \frac{2\gamma\sigma}{L_1\kappa^2}\|g_k\|^{s}
-\left(1 - \frac{\sigma}{2\kappa^2}\|g_k\|^{s}\right).
+\label{eq:K_R3}
+K^3_{\mathcal{R}} \;\leq\; \frac{L_1}{\gamma}
+\log\frac{L_1^2\delta^2}{\varepsilon_g^2}.
 \end{equation}
 
-\paragraph{Step 3: Analysis of $C_{\mathcal{N},k}$ as a function of $\|g_k\|$.}
-Let $u := \|g_k\|^s$, so that $C_{\mathcal{N},k} = \frac{2\gamma\sigma}{L_1\kappa^2}h(u)$ where:
-\[
-h(u) := u - \frac{\sigma}{2\kappa^2}u^2.
-\]
-This is a concave quadratic in $u$, opening downward. Taking the derivative:
-\[
-\frac{\partial h}{\partial u} = 1 - \frac{\sigma}{\kappa^2}u = 0 
-\implies u^\star = \frac{\kappa^2}{\sigma}.
-\]
-Hence $h$ attains its maximum at $u^\star = \frac{\kappa^2}{\sigma}$. 
-Moreover, $h(u) > 0$ if and only if:
-\[
-u\!\left(1 - \frac{\sigma}{2\kappa^2}u\right) > 0.
-\]
-Since $u > 0$, this reduces to $u < \frac{2\kappa^2}{\sigma}$, 
-so $h(u) > 0$ on $\left(0, \frac{2\kappa^2}{\sigma}\right)$.
+% -------------------------------------------------------------------
+\subsubsection{Non-restarted iterations in Regime 3
+               ($k\in\mathcal{N}^3$)}
+\label{subsubsec:N3}
+% -------------------------------------------------------------------
 
-\paragraph{Step 4: Lower bound on $C_{\mathcal{N},k}$.}
-In Regime 3, two bounds on $\|g_k\|$ hold simultaneously:
-\begin{itemize}
-    \item \textbf{Upper bound:} $\|g_k\| \leq L_1\delta$ 
-    (from~\eqref{eq:entry_grad_upper}).
-    \item \textbf{Lower bound:} $\|g_k\| \geq \varepsilon_g$ 
-    (algorithm has not yet converged).
-\end{itemize}
-Hence $u = \|g_k\|^s \in \left[\varepsilon_g^s,\, (L_1\delta)^s\right]$ if $s > 0$, 
-and $u \in \left[(L_1\delta)^s,\, \varepsilon_g^s\right]$ if $s < 0$. 
-Since $h$ is increasing on $(0, u^\star)$, the minimum of $C_{\mathcal{N},k}$ 
-depends on the sign of $s$:
-
-\begin{itemize}
-    \item \textbf{Case 1: $s = 0$ ($q = \frac{1+p}{2}$).} 
-    $u = 1$ is constant, so $C_{\mathcal{N},k}$ is already independent of $k$:
-    \[
-    C_{\min} = \frac{2\gamma\sigma}{L_1\kappa^2}\!\left(1 - \frac{\sigma}{2\kappa^2}\right).
-    \]
-
-    \item \textbf{Case 2: $s > 0$ ($q < \frac{1+p}{2}$).} 
-    $u$ is increasing in $\|g_k\|$, so its minimum is at $\|g_k\| = \varepsilon_g$:
-    \[
-    C_{\min} = \frac{2\gamma\sigma}{L_1\kappa^2}\,\varepsilon_g^s
-    \!\left(1 - \frac{\sigma}{2\kappa^2}\varepsilon_g^s\right).
-    \]
-
-    \item \textbf{Case 3: $s < 0$ ($q > \frac{1+p}{2}$).} 
-    $u$ is decreasing in $\|g_k\|$, so its minimum is at $\|g_k\| = L_1\delta$:
-    \[
-    C_{\min} = \frac{2\gamma\sigma}{L_1\kappa^2}(L_1\delta)^s
-    \!\left(1 - \frac{\sigma}{2\kappa^2}(L_1\delta)^s\right).
-    \]
-\end{itemize}
-
-In all cases, $C_{\mathcal{N},k} \geq C_{\min} > 0$, 
-and~\eqref{eq:descent_R3_N} gives the uniform geometric contraction:
+We present two complexity results for non-restarted iterations.
+Theorem~\ref{thm:lyapunov} uses a Lyapunov function argument and
+gives the sharpest possible convergence classification, including
+finite termination. Theorem~\ref{thm:geometric} uses a uniform
+geometric contraction and produces a bound directly comparable to
+\cite{RoyerChan2022}.\\
+Lemma~\ref{lem:decrease_N} gives, for every $k\in\mathcal{N}^3$:
 \begin{equation}
-\label{eq:geometric_N3}
-\Delta_{k+1} \leq (1 - C_{\min})\,\Delta_k.
+\label{eq:base_decrease}
+\Delta_k - \Delta_{k+1} \;\geq\; c_{\mathcal{N}}\|g_k\|^{2r},
+\qquad r:=1+p-q,
 \end{equation}
-
-\paragraph{Step 5: Complexity bound.}
-Iterating~\eqref{eq:geometric_N3} over $K$ non-restarted iterations:
-\[
-\Delta_K \leq (1 - C_{\min})^K \Delta_0 
-\leq (1 - C_{\min})^K \cdot \frac{L_1\delta^2}{2}.
-\]
-Requiring $\Delta_K \leq \varepsilon_g^2/(2L_1)$ and 
-using $-\log(1-C) \geq C$ for $C \in (0,1)$:
-\[
-K \leq \frac{1}{C_{\min}}\log\frac{L_1^2\delta^2}{\varepsilon_g^2}.
-\]
-Substituting $C_{\min}$ in each case:
+where $c_{\mathcal{N}}=\sigma^2/(2L_1\kappa^2)$.
+Applying the PL inequality $\|g_k\|^2\geq 2\gamma\Delta_k$
+to~\eqref{eq:base_decrease} yields the fundamental recurrence:
 \begin{equation}
-\label{eq:K_N3}
-K^3_{\mathcal{N}} \leq 
-\begin{cases}
-\dfrac{L_1\kappa^2}{2\gamma\sigma\!\left(1 - \frac{\sigma}{2\kappa^2}\right)}
-\log\dfrac{L_1^2\delta^2}{\varepsilon_g^2} 
-& \text{if } s = 0, \\[14pt]
-\dfrac{L_1\kappa^2}{2\gamma\sigma\,\varepsilon_g^s\!\left(1 
-- \frac{\sigma}{2\kappa^2}\varepsilon_g^s\right)}
-\log\dfrac{L_1^2\delta^2}{\varepsilon_g^2} 
-& \text{if } s > 0, \\[14pt]
-\dfrac{L_1\kappa^2}{2\gamma\sigma\,(L_1\delta)^s\!\left(1 
-- \frac{\sigma}{2\kappa^2}(L_1\delta)^s\right)}
-\log\dfrac{L_1^2\delta^2}{\varepsilon_g^2} 
-& \text{if } s < 0,
-\end{cases}
+\label{eq:Delta_recurrence}
+\Delta_{k+1} \;\leq\; \Delta_k - C\Delta_k^r,
+\qquad C \;:=\; c_{\mathcal{N}}(2\gamma)^r
+= \frac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}.
 \end{equation}
-where $s = 1+p-2q$.
+Both theorems below depart from~\eqref{eq:Delta_recurrence}.
 
-This proof technique gives linear convergence for $s = 0$ and $s < 0$ and sublinear convergence for $s > 0$.
+% ===================================================================
+\begin{theorem}[Lyapunov function bound]
+\label{thm:lyapunov}
+Let $f$ satisfy A1--A2 and the $(\zeta,\beta,\gamma,\delta)$-strict
+saddle property. Let $\{x_k\}_{k\in\mathcal{N}^3}$ be generated by
+Algorithm~\ref{algo:hybrid} with stepsize
+$\alpha^\star=\tfrac{\sigma}{L_1\kappa^2}\|g_k\|^{1+p-2q}$, and let
+$r:=1+p-q$ and $C:=\tfrac{\sigma^2(2\gamma)^r}{2L_1\kappa^2}$.
+\begin{enumerate}[label=(\roman*)]
+  \item \textbf{Linear convergence} ($p=q$, $r=1$):
+  \begin{equation}
+  \label{eq:N3_r1}
+  K^3_{\mathcal{N},\,p=q} \;\leq\;
+  \frac{L_1\kappa^2}{\sigma^2\gamma}
+  \log\frac{L_1^2\delta^2}{\varepsilon_g^2}.
+  \end{equation}
 
-\subsubsection{Proofs Comparison}
+  \item \textbf{Sublinear convergence} ($p>q$, $r>1$):
+  \begin{equation}
+  \label{eq:N3_r_big}
+  K^3_{\mathcal{N},\,p>q} \;\leq\;
+  \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(p-q)}
+  \left[
+    \left(\frac{\varepsilon_g^2}{2L_1}\right)^{q-p}
+    -\left(\frac{L_1\delta^2}{2}\right)^{q-p}
+  \right].
+  \end{equation}
 
-Comparison of the two proof techniques is hard since they use different thresholds for different cases. 
-\paragraph{Potential Function proof.} In this proof, we compare $r = 1+p-q$ to 1. This amounts to comparing if $p = q$, 
-$p < q$, or $p > q$.
+  \item \textbf{Finite termination} ($p<q$, $r<1$):
+  \begin{equation}
+  \label{eq:N3_r_small}
+  K^3_{\mathcal{N},\,p<q} \;\leq\;
+  \left(\frac{L_1\delta^2}{2}\right)^{q-p}
+  \frac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(q-p)}.
+  \end{equation}
+  This bound is independent of $\varepsilon_g$: the algorithm
+  reaches $f(x_{K^\star})=f(x^\star)$ exactly in finitely many
+  non-restarted steps.
+\end{enumerate}
+\end{theorem}
 
-\paragraph{Geometric Recursion Proof.} In this proof, we compare $s = 1+p-2q$ to 0. 
-This amounts to comparing if $q = \frac{1+p}{2}$, $q < \frac{1+p}{2}$, or $q > \frac{1+p}{2}$.
+\begin{proof}
+All three cases depart from recurrence~\eqref{eq:Delta_recurrence}.
 
-Therefore, the results are not directly comparable. However, we can still say that the potential function proof
-gives 3 possible convergence regimes: linear, sublinear, and finite termination whereas the geometric recursion proof
-gives sublinear and linear convergences.\\
-The two approaches carve the $(p, q)$ parameter space differently.
-For example, let's take $p = 0.5$ and $q = 0.6$.\\
-$r = 1 + 0.5 - 0.6 = 0.9 < 1 \rightarrow$ Finite termination with potential function proof.\\
-$s = 1 + 0.5 - 1.2 = 0.3 > 0 \rightarrow$ Sublinear rate with geometric recursion proof.
+\medskip
+\noindent\textit{Case (i): $r=1$.}
+Recurrence~\eqref{eq:Delta_recurrence} becomes
+$\Delta_{k+1}\leq(1-C)\Delta_k$, a geometric contraction with
+$C=\sigma^2\gamma/(L_1\kappa^2)\in(0,1)$.
+Telescoping over $K^3_{\mathcal{N}}$ iterations and using
+$-\log(1-C)\geq C$:
+\[
+K^3_{\mathcal{N}} \;\leq\; \frac{1}{C}\log\frac{\Delta_{k_0}}{\varepsilon}
+\;\leq\; \frac{L_1\kappa^2}{\sigma^2\gamma}\log\frac{L_1^2\delta^2}{\varepsilon_g^2},
+\]
+where we substituted~\eqref{eq:entry_upper} and
+$\varepsilon=\varepsilon_g^2/(2L_1)$.
 
-\noindent Another example would be $p = 0.5$ and $q = 0.8$.\\
-$r = 1 + 0.5 - 0.8 = 0.7 < 1 \rightarrow$ Finite termination with potential function proof.\\
-$s = 1 + 0.5 - 1.6 = -0.1 < 0 \rightarrow$ Linear rate with geometric recursion proof. 
+\medskip
+\noindent\textit{Case (ii): $r>1$.}
+Define the Lyapunov function $\phi_k:=\Delta_k^{1-r}$, where $1-r<0$.
+Since $t\mapsto t^{1-r}$ is \emph{convex} for $r>1$, raising both
+sides of~\eqref{eq:Delta_recurrence} to the power $1-r<0$ flips the
+inequality:
+\[
+\phi_{k+1} \;\geq\; \Delta_k^{1-r}(1-C\Delta_k^{r-1})^{1-r}
+\;=\; \phi_k(1-C\phi_k^{-1})^{1-r}.
+\]
+Applying the convexity bound $(1-x)^{1-r}\geq 1+(r-1)x$ for
+$x\in(0,1)$ (which holds since $t\mapsto t^{1-r}$ is convex):
+\[
+\phi_{k+1} \;\geq\; \phi_k\bigl(1+(r-1)C\phi_k^{-1}\bigr)
+= \phi_k + (r-1)C.
+\]
+We first verify that $a := C\Delta_k^{r-1} \in (0,1)$.
+Positivity is immediate since $C > 0$ and $\Delta_k > 0$.
+For the upper bound, suppose $a \geq 1$: then the right-hand
+side of~\eqref{eq:Delta_recurrence} satisfies
+$\Delta_k - C\Delta_k^r = \Delta_k(1 - a) \leq 0$,
+giving $\Delta_{k+1} \leq f(x^\star)$. Since $x_{k+1}
+\in B(x^\star, 2\delta)$ where $f$ is strongly convex,
+$f(x_{k+1}) \geq f(x^\star)$, so $\Delta_{k+1} = 0$:
+the algorithm has already converged. Hence for any
+non-terminated run, $a \in (0,1)$.
+Telescoping over $K^3_{\mathcal{N}}$ iterations:
+\[
+\phi_K \;\geq\; \phi_0 + K^3_{\mathcal{N}}(r-1)C.
+\]
+Requiring $\Delta_K\leq\varepsilon$ with $1-r<0$ gives
+$\phi_K\geq\varepsilon^{1-r}$, hence:
+\[
+K^3_{\mathcal{N}} \;\leq\;
+\frac{\varepsilon^{1-r}-\phi_0}{(r-1)C}.
+\]
+Substituting $\phi_0=\Delta_{k_0}^{1-r}\geq(L_1\delta^2/2)^{1-r}$,
+$C=\sigma^2(2\gamma)^r/(2L_1\kappa^2)$, and
+$\varepsilon=\varepsilon_g^2/(2L_1)$ yields~\eqref{eq:N3_r_big}.
 
-The following graph shows the space partition made by each proof:
+\medskip
+\noindent\textit{Case (iii): $r<1$, $r > 0$.}
+Define the Lyapunov function $\phi_k:=\Delta_k^{1-r}$, where
+$1-r>0$. The function $t\mapsto t^{1-r}$ is \emph{concave} for
+$0<r<1$. Raising both sides of~\eqref{eq:Delta_recurrence} to the
+power $1-r>0$ preserves the inequality:
+\[
+\phi_{k+1} \;\leq\; \phi_k(1-C\phi_k^{-1})^{1-r}.
+\]
+Applying the concavity bound $(1-x)^{1-r}\leq 1+(r-1)x$ for
+$x\in(0,1)$:
+\[
+\phi_{k+1} \;\leq\; \phi_k\bigl(1+(r-1)C\phi_k^{-1}\bigr)
+= \phi_k - (1-r)C.
+\]
+Hence $\phi_k$ decreases by the fixed amount $(1-r)C>0$ at every
+iteration. Telescoping:
+\[
+\phi_K \;\leq\; \phi_0 - K^3_{\mathcal{N}}(1-r)C.
+\]
+Since $\phi_K=\Delta_K^{1-r}\geq 0$:
+\[
+K^3_{\mathcal{N}} \;\leq\; \frac{\phi_0}{(1-r)C}.
+\]
+At $K^\star=\lceil\phi_0/((1-r)C)\rceil$, the recursion requires
+$\phi_{K^\star}\leq 0$. Since $\phi_{K^\star}\geq 0$, the only
+consistent value is $\phi_{K^\star}=0$, i.e.\
+$f(x_{K^\star})=f(x^\star)$ exactly.
+Substituting $\phi_0\leq(L_1\delta^2/2)^{1-r}$ and
+$C=\sigma^2(2\gamma)^r/(2L_1\kappa^2)$
+yields~\eqref{eq:N3_r_small}.
+\end{proof}
 
-\definecolor{colorR1finite}{RGB}{250,236,231}
-\definecolor{colorMiddle}{RGB}{225,245,238}
-\definecolor{colorBlue}{RGB}{230,241,251}
-\definecolor{lineRoute1}{RGB}{55,138,221}
-\definecolor{lineRoute2}{RGB}{216,90,48}
+\begin{remark}[Extension to $r\leq 0$]
+\label{rem:r_negative}
+When $q>1+p$, i.e.\ $r\leq 0$, the concavity argument above no
+longer applies since $t\mapsto t^{1-r}$ becomes convex. However,
+since $r\leq 0$ and $\Delta_k$ is decreasing, $\Delta_k^r$ is
+increasing, so $\Delta_k^r\geq\Delta_{k_0}^r$ for all $k\geq k_0$.
+Recurrence~\eqref{eq:Delta_recurrence} then gives
+$\Delta_{k+1}\leq\Delta_k - C\Delta_{k_0}^r$: a constant decrease
+of $C\Delta_{k_0}^r$ per step. The algorithm therefore reaches
+$f(x^\star)$ exactly in at most
+$\lceil\Delta_{k_0}/(C\Delta_{k_0}^r)\rceil
+=\lceil\Delta_{k_0}^{1-r}/C\rceil$
+iterations. It yields finite termination with a different constant than
+\eqref{eq:N3_r_small}, but the same qualitative conclusion.
+\end{remark}
+% ===================================================================
 
-\begin{tikzpicture}
-\begin{axis}[
-    width=10cm, height=10cm,
-    xmin=0, xmax=2,
-    ymin=0, ymax=2,
-    xlabel={$p$},
-    ylabel={$q$},
-    axis lines=left,
-    xtick={0,0.5,1,1.5,2},
-    ytick={0,0.5,1,1.5,2},
-    grid=both,
-    grid style={dotted, gray!40},
-    tick label style={font=\small},
-    label style={font=\small},
-    clip=true,
-]
-
-%% --- Filled regions ---
-
-%% Bottom region: below both lines
-%% For p in [0,1]: below q=p; for p in [1,2]: below q=(1+p)/2
-\addplot[fill=colorBlue, opacity=0.6, draw=none] 
-    coordinates {(0,0) (1,1) (2,1.5) (2,0) (0,0)};
-
-%% Middle-left region: between q=p (below) and q=(1+p)/2 (above), for p in [0,1]
-\addplot[fill=colorMiddle, opacity=0.7, draw=none]
-    coordinates {(0,0) (1,1) (0,0.5) (0,0)};
-
-%% Middle-right region: between q=(1+p)/2 (below) and q=p (above), for p in [1,2]
-\addplot[fill=colorMiddle, opacity=0.7, draw=none]
-    coordinates {(1,1) (2,2) (2,1.5) (1,1)};
-
-%% Top region: above both lines
-\addplot[fill=colorR1finite, opacity=0.7, draw=none]
-    coordinates {(0,0.5) (1,1) (2,2) (2,2) (0,2) (0,0.5)};
-
-%% --- Threshold lines ---
-
-%% Route 1: q = p
-\addplot[color=lineRoute1, thick, -stealth, samples=2, domain=0:2]
-    {x};
-\node[color=lineRoute1, font=\small, rotate=45, above] at (axis cs:1.6,1.6) {$q = p$};
-
-%% Route 2: q = (1+p)/2
-\addplot[color=lineRoute2, thick, dashed, -stealth, samples=2, domain=0:2]
-    {(1+x)/2};
-\node[color=lineRoute2, font=\small, rotate=26, below] at (axis cs:1.5,1.1) 
-    {$q = \frac{1+p}{2}$};
-
-%% Intersection point (1,1)
-\addplot[mark=*, mark size=2.5pt, mark options={fill=white, draw=black, line width=1pt}]
-    coordinates {(1,1)};
-\node[font=\tiny, above right] at (axis cs:1,1) {$(1,1)$};
-
-%% --- Region labels ---
-
-%% Top region
-\node[font=\tiny, align=center, color=lineRoute2!70!black] at (axis cs:0.4,1.6)
-    {P1: finite term.\\ P2: linear conv.};
-
-%% Middle-left region
-\node[font=\tiny, align=center, color=teal!70!black] at (axis cs:0.25,0.6)
-    {P1: finite term.\\ P2: sublinear};
-
-%% Middle-right region
-\node[font=\tiny, align=center, color=teal!70!black] at (axis cs:1.7,1.75)
-    {P1: sublinear\\ P2: linear conv.};
-
-%% Bottom region
-\node[font=\tiny, align=center, color=lineRoute1!70!black] at (axis cs:1.5,0.4)
-    {P1: sublinear\\ P2: sublinear};
-
-\end{axis}
-\end{tikzpicture}
+\begin{remark}[Comparison with gradient descent]
+\label{rem:gd_comparison}
+Bound~\eqref{eq:N3_r1} matches the restarted rate~\eqref{eq:K_R3}
+up to the factor $\sigma^2/\kappa^2\leq 1$, recovering the gradient
+descent baseline for $p=q$. Bound~\eqref{eq:N3_r_small} establishes
+that, for any $p<q$, the non-restarted NCG phase reaches the
+\emph{exact} minimizer in finitely many steps which an
+improvement over gradient descent, which can only guarantee
+$\Delta_k\leq\varepsilon$ for any fixed $\varepsilon>0$.
+\end{remark}
 
 
 \subsubsection{Restarted iterations in Regime 3 ($k \in \mathcal{R}^3$)}
@@ -806,33 +640,58 @@ K^3_{\mathcal{R}} \leq \frac{L_1}{\gamma}\log\frac{L_1\delta^2}{2\varepsilon}.
 
 \begin{theorem}
 \label{thm:strict_saddle}
-Under A1--A3, suppose $f$ is $(\zeta, \beta, \gamma, \delta)$-strict saddle. Then Algorithm~\ref{algo:hybrid} with $\varepsilon_g = \zeta$ and $\varepsilon_H = \beta$ reaches a point near a local minimizer in at most $K$ iterations, where:
+Under A1--A3, suppose $f$ is $(\zeta,\beta,\gamma,\delta)$-strict
+saddle. Then Algorithm~\ref{algo:hybrid} with $\varepsilon_g=\zeta$
+and $\varepsilon_H=\beta$ reaches a point near a local minimizer in
+at most $K$ iterations, where:
 \begin{equation}
 \label{eq:total}
-\boxed{
-K \leq \underbrace{\frac{\Delta f}{c_{\mathcal{R}}}\,\zeta^{-2} + \frac{\Delta f}{c_{\mathcal{N}}}\,\zeta^{-2(1+p-q)}}_{\text{Regime 1}} + \underbrace{\frac{3L_2^2\,\Delta f}{2\beta^3}}_{\text{Regime 2}} + \underbrace{\frac{L_1}{\gamma}\log\frac{L_1\delta^2}{2\varepsilon} + K^3_{\mathcal{N}}(r)}_{\text{Regime 3}}
-}
+K \;\leq\;
+\underbrace{\frac{\Delta_0}{c_{\mathcal{R}}}\,\zeta^{-2}
++ \frac{\Delta_0}{c_{\mathcal{N}}}\,\zeta^{-2(1+p-q)}}_{\text{Regime 1}}
+\;+\;
+\underbrace{\frac{3L_2^2\,\Delta_0}{2\beta^3}}_{\text{Regime 2}}
+\;+\;
+\underbrace{\frac{L_1}{\gamma}\log\frac{L_1^2\delta^2}{\varepsilon_g^2}
++ K^3_{\mathcal{N}}}_{\text{Regime 3}},
 \end{equation}
-where $K^3_{\mathcal{N}}(r)$ depends on $r = 1+p-q$:
+with $r:=1+p-q$ and $K^3_{\mathcal{N}}$ given by
+Theorem~\ref{thm:lyapunov}:
 \[
-K^3_{\mathcal{N}}(r) = 
+K^3_{\mathcal{N}} \;=\;
 \begin{cases}
-\dfrac{L_1\kappa^2}{\sigma^2\gamma}\log\dfrac{L_1\delta^2}{2\varepsilon} & \text{if } r = 1, \\[12pt]
-\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(r-1)}\left(\varepsilon^{1-r} - \left(\dfrac{L_1\delta^2}{2}\right)^{1-r}\right) & \text{if } r > 1, \\[12pt]
-\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(1-r)}\left(\dfrac{L_1\delta^2}{2}\right)^{1-r} & \text{if } r < 1.
+\dfrac{L_1\kappa^2}{\sigma^2\gamma}
+\log\dfrac{L_1^2\delta^2}{\varepsilon_g^2}
+& \text{if } p = q, \\[12pt]
+\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(p-q)}
+\!\left[\!\left(\dfrac{\varepsilon_g^2}{2L_1}\right)^{q-p}
+\!-\!\left(\dfrac{L_1\delta^2}{2}\right)^{q-p}\right]
+& \text{if } p > q, \\[12pt]
+\left(\dfrac{L_1\delta^2}{2}\right)^{q-p}
+\dfrac{2L_1\kappa^2}{\sigma^2(2\gamma)^r(q-p)}
+& \text{if } p < q.
 \end{cases}
 \]
 \end{theorem}
 
 \begin{proof}
-Combine~\eqref{eq:regime1},~\eqref{eq:regime2}, and the Regime~3 bounds from Sections~\ref{subsec:regime3}. The bound is conservative because each regime 
-uses $\Delta f^j \leq \Delta f$ independently, whereas $\Delta f^1 + \Delta f^2 + \Delta f^3 \leq \Delta f$. If we knew all $\Delta f^j$ in advance, we could
-plug it in the bound to have something tighter.
+Sum the bounds from~\eqref{eq:regime1},~\eqref{eq:regime2},
+\eqref{eq:K_R3}, and Theorem~\ref{thm:lyapunov}. Each regime bound
+uses $\Delta_0$ independently, which is conservative: the true
+budget satisfies $\Delta_0^1+\Delta_0^2+\Delta_0^3\leq\Delta_0$,
+so the individual bounds could in principle be tightened if the
+per-regime budgets were known a priori.
 \end{proof}
 
-The restarted terms ($\zeta^{-2}$ in Regime~1, $\frac{L_1}{\gamma}\log\frac{1}{\varepsilon}$ in Regime~3) match GD. 
-The overall bound strictly improves over GD only when $K^1_{\mathcal{R}} + K^3_{\mathcal{R}} \ll K$. 
-
+\begin{remark}
+The restarted terms $\zeta^{-2}$ in Regime~1 and
+$\frac{L_1}{\gamma}\log\frac{1}{\varepsilon_g}$ in Regime~3
+match the gradient descent baseline. The non-restarted Regime~3
+term $K^3_{\mathcal{N}}$ is the novel contribution: for $p<q$ it
+is independent of $\varepsilon_g$, so the overall bound improves
+over gradient descent whenever the algorithm spends a significant
+fraction of its iterations in the non-restarted Regime~3 phase.
+\end{remark}
 % ------------------- Analysis of staying in REGIME 3 (ONGOING) -------------------
 
 \section{Regime 3 Analysis}
