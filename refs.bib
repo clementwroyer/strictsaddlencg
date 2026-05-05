@@ -1,0 +1,36 @@
+@article{RoyerChan2022,
+title = {A nonlinear conjugate gradient method with complexity guarantees and its application to nonconvex regression},
+journal = {EURO Journal on Computational Optimization},
+volume = {10},
+pages = {100044},
+year = {2022},
+issn = {2192-4406},
+doi = {https://doi.org/10.1016/j.ejco.2022.100044},
+url = {https://www.sciencedirect.com/science/article/pii/S219244062200020X},
+author = {Rémi Chan–Renous-Legoubin and Clément W. Royer},
+abstract = {Nonlinear conjugate gradients are among the most popular techniques for solving continuous optimization problems. Although these schemes have long been studied from a global convergence standpoint, their worst-case complexity properties have yet to be fully understood, especially in the nonconvex setting. In particular, it is unclear whether nonlinear conjugate gradient methods possess better guarantees than first-order methods such as gradient descent. Meanwhile, recent experiments have shown impressive performance of standard nonlinear conjugate gradient techniques on certain nonconvex problems, even when compared with methods endowed with the best known complexity guarantees. In this paper, we propose a nonlinear conjugate gradient scheme based on a simple line-search paradigm and a modified restart condition. These two ingredients allow for monitoring the properties of the search directions, which is instrumental in obtaining complexity guarantees. Our complexity results illustrate the possible discrepancy between nonlinear conjugate gradient methods and classical gradient descent. A numerical investigation on nonconvex robust regression problems as well as a standard benchmark illustrate that the restarting condition can track the behavior of a standard implementation.}
+}
+
+@book{WrightMa2022,
+  author    = {John Wright and Yi Ma},
+  title     = {High-Dimensional Data Analysis with Low-Dimensional Models: Principles, Computation, and Applications},
+  publisher = {Cambridge University Press},
+  year      = {2022},
+}
+
+@InProceedings{GeSaddle15,
+  title = 	 {Escaping From Saddle Points --- Online Stochastic Gradient for Tensor Decomposition},
+  author = 	 {Ge, Rong and Huang, Furong and Jin, Chi and Yuan, Yang},
+  booktitle = 	 {Proceedings of The 28th Conference on Learning Theory},
+  pages = 	 {797--842},
+  year = 	 {2015},
+  editor = 	 {Grünwald, Peter and Hazan, Elad and Kale, Satyen},
+  volume = 	 {40},
+  series = 	 {Proceedings of Machine Learning Research},
+  address = 	 {Paris, France},
+  month = 	 {03--06 Jul},
+  publisher =    {PMLR},
+  pdf = 	 {http://proceedings.mlr.press/v40/Ge15.pdf},
+  url = 	 {https://proceedings.mlr.press/v40/Ge15.html},
+  abstract = 	 {We analyze stochastic gradient descent for optimizing non-convex functions. In many cases for non-convex functions the goal is to find a reasonable local minimum, and the main concern is that gradient updates are trapped in \em saddle points. In this paper we identify \em strict saddle property for non-convex problem that allows for efficient optimization. Using this property we show that from an \em arbitrary starting point,  stochastic gradient descent converges to a local minimum in a polynomial number of iterations. To the best of our knowledge this is the first work that gives \em global convergence guarantees for stochastic gradient descent on non-convex functions with exponentially many local minima and saddle points. Our analysis can be applied to orthogonal tensor decomposition, which is widely used in learning a rich class of  latent variable models. We propose a new optimization formulation for the tensor decomposition problem that has strict saddle property. As a result we get the first online algorithm for orthogonal tensor decomposition with global convergence guarantee.}
+}
