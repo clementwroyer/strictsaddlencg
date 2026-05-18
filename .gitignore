@@ -5,5 +5,7 @@
 *.gz
 *.bbl
 *.blg
+*.out
+*.toc
 .DS_Store
 **/.DS_Store
