@@ -1,0 +1,542 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{booktabs}
+
+% --- Theorem environments (each with its own counter so cleveref works) ---
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{corollary}{Corollary}[section]
+\theoremstyle{definition}
+\newtheorem{remark}{Remark}[section]
+\newtheorem{observation}{Observation}[section]
+
+% --- Macros ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\inner}[2]{\langle #1,\,#2 \rangle}
+\newcommand{\grad}{\nabla}
+\newcommand{\hess}{\nabla^{2}}
+\newcommand{\xstar}{x^{\star}}
+\newcommand{\epsg}{\varepsilon_{g}}
+\newcommand{\epsH}{\varepsilon_{H}}
+\newcommand{\Lone}{L_{1}}
+\newcommand{\Ltwo}{L_{2}}
+\newcommand{\setN}{\mathcal{N}}
+\newcommand{\setR}{\mathcal{R}}
+\newcommand{\cN}{c_{\setN}}
+
+% --- Figure paths (adjust to your local layout) ---
+% Root directory for all figures
+\newcommand{\figroot}{Figures_Num_XP_LS}
+
+% Featured cell for the (p,q) deep dive in Section 4:
+%   PRP+, sigma=0.1, kappa=2, dim=5x5, cn=10
+\newcommand{\featuredcell}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=10}
+
+% Conditioning cells for the Section 3 headline (all PRP+, sigma=0.1, kappa=2, dim=5x5):
+\newcommand{\cellcni}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=1}
+\newcommand{\cellcnten}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=10}
+\newcommand{\cellcnhundred}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=100}
+
+% Beta-comparison cells for Section 5 (all sigma=0.1, kappa=2, dim=5x5, cn=10):
+\newcommand{\cellbetaPRP}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=10}
+\newcommand{\cellbetaHZ}{figures_HZ_sig=0.01_kap=100.0_dim=5x5_cn=10}
+\newcommand{\cellbetaFR}{figures_FR_sig=0.01_kap=100.0_dim=5x5_cn=10}
+% Tight-restart variants:
+\newcommand{\cellbetaPRPtight}{figures_PRPplus_sig=0.1_kap=2.0_dim=5x5_cn=10}
+\newcommand{\cellbetaFRtight}{figures_FR_sig=0.1_kap=2.0_dim=5x5_cn=10}
+
+% Dimension cells for Section 6 (all PRP+, sigma=0.1, kappa=2, cn=10):
+\newcommand{\celldimsmall}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x1_cn=10}
+\newcommand{\celldimlarge}{figures_PRPplus_sig=0.01_kap=100.0_dim=5x5_cn=10}
+
+
+\title{Numerical Experiments for Hybrid Nonlinear Conjugate Gradient and Negative Curvature Descent with Line Search on Strict-Saddle Functions}
+\author{Benjamin Séguin\\ \small Supervised by Clément Royer \\ \small LAMSADE}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a numerical study of the previously-developed hybrid nonlinear 
+conjugate-gradient (NCG) and negative-curvature descent algorithm with 
+backtracking line search on a parametric family of strict-saddle problems. 
+We tie experimental results to the complexity analysis and identify two 
+empirical phenomena: \textbf{(i)} the algorithm outperforms gradient descent 
+on conditioned variants of the problem, and the speed-up grows with the 
+condition number of the target matrix; \textbf{(ii)} 
+the exponent $R$ is not a reliable predictor of 
+pre-asymptotic iteration count, which is dominated by restart frequency.
+\end{abstract}
+
+\tableofcontents
+
+% ============================================================
+\section{Introduction}\label{sec:intro}
+% ============================================================
+
+The theoretical complexity bound for Algorithm~\ref{alg:hybrid-ls} predicts a 
+per-regime iteration count that depends on the exponent
+\[
+  R := \tfrac{1}{2}\max(1+p,\, 2(1+p-q)),
+\]
+with linear convergence in Regime~3 when $R \leq 1$ and sublinear 
+convergence with exponent $1/(R-1)$ when $R > 1$. The bound is 
+independent of the specific choice of conjugate-direction parameter $\beta$. 
+This document investigates, empirically, three questions:
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{When does the algorithm beat gradient descent?} The theoretical bound shows that NCG converges, but does not establish a separation from GD. We answer this by varying the conditioning of a parametric test problem and observing the empirical separation.
+  \item \textbf{Does the choice of $\beta$ matter in practice?} The theory is $\beta$-agnostic. We test whether this neutrality holds empirically and find that it does not.
+  \item \textbf{Does $R$ predict iteration count?} The theoretical bound is asymptotic in $\epsg$. We test whether pre-asymptotic iteration count tracks $R$, and find that it does not; restart frequency is the dominant variable.
+\end{enumerate}
+The first finding is that for some conditions defined by the setup stated in Section~\ref{subsec:problem}, 
+NCG beats GD by a clear margin. The second and third findings characterize 
+how the algorithm behaves across the parameter space and identify what drives
+its performance.
+
+% ============================================================
+\section{Setup}\label{sec:setup}
+% ============================================================
+
+\begin{algorithm}
+\caption{Hybrid NCG / Negative-Curvature Descent with Line Search}\label{alg:hybrid-ls}
+\begin{algorithmic}[1]
+\Require $x_{0} \in \R^{d}$, $\eta \in (0,1)$, $\theta \in (0,1)$, $\sigma \in (0,1]$, $\kappa \geq 1$, $p \geq 0$, $q \geq 0$, $\epsg > 0$, $\epsH > 0$.
+\State Set $g_{0} = \grad f(x_{0})$, $d_{0} = -g_{0}$, $k = 0$.
+\For{$k = 0, 1, 2, \dots$}
+  \State Compute $g_{k} = \grad f(x_{k})$.
+  \If{$\norm{g_{k}} \geq \epsg$}
+    \State Compute $\alpha_{k} = \theta^{j_{k}}$, where $j_{k}$ is the smallest nonnegative integer such that
+    \begin{equation}\label{eq:armijo}
+      f(x_{k} + \alpha_{k} d_{k}) \leq f(x_{k}) + \eta\,\alpha_{k}\,g_{k}^{\top} d_{k}.
+    \end{equation}
+    \State Set $x_{k+1} = x_{k} + \alpha_{k} d_{k}$ and $g_{k+1} = \grad f(x_{k+1})$.
+    \State Choose a conjugate-direction parameter $\beta_{k+1}$ and set $d_{k+1} = -g_{k+1} + \beta_{k+1} d_{k}$.
+    \If{the restart condition holds:
+      \begin{equation}\label{eq:restart}
+        g_{k+1}^{\top} d_{k+1} \geq -\sigma\,\norm{g_{k+1}}^{1+p}
+        \quad\text{(a)}\quad\text{or}\quad
+        \norm{d_{k+1}} \geq \kappa\,\norm{g_{k+1}}^{q}\quad\text{(b)},
+      \end{equation}}
+      \State Restart: $d_{k+1} = -g_{k+1}$.
+    \EndIf
+  \Else
+    \State Compute smallest eigenvalue $\lambda_{k}$ and an eigenvector $e_{k}$ of $\hess f(x_{k})$, with $\inner{g_{k}}{e_{k}} \leq 0$.
+    \If{$-\lambda_{k} \geq \epsH$}
+      \State Set $x_{k+1} = x_{k} + \tfrac{2 \lambda_{k}}{\Ltwo}\,e_{k}$ and $d_{k+1} = -\grad f(x_{k+1})$.
+    \Else
+      \State \textbf{stop} and \textbf{return} $\xstar = x_{k}$.
+    \EndIf
+  \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Test problem}\label{subsec:problem}
+
+We apply Algorithm~\ref{alg:hybrid-ls} to a matrix factorization problem (which was proven to be strict saddle in~\cite{bhojanapalli2016global}):
+\begin{equation}\label{eq:matfact}
+  \min_{X \in \R^{n \times r}}\ f(X) = \tfrac{1}{2}\,\norm{X X^\top - M}_F^2,
+\end{equation}
+where $M \in \R^{n \times n}$ is a fixed symmetric positive-definite matrix. The problem has three relevant properties for any positive-definite $M$:
+\begin{enumerate}[leftmargin=2em]
+  \item $X = 0$ is a strict saddle. The Hessian at the origin has eigenvalues $-2\,\lambda_i(M)$ for $i = 1, \ldots, n$, each repeated $r$ times, all strictly negative.
+  \item Any $X$ with $X X^\top = M$ is a global minimizer, with $f^\star = 0$ (provided $r \geq n$).
+  \item All other critical points are strict saddles~\cite{pmlr-v70-ge17a}.
+\end{enumerate}
+We take $M$ to be diagonal with eigenvalue equally spaced between $1$ and $1/\mathrm{cn}$,
+where $\mathrm{cn}$ is a control parameter for the condition number $\kappa(M) = \mathrm{cn}$. The 
+case $\mathrm{cn} = 1$ recovers the standard well-conditioned problem $M = I_n$. 
+\begin{equation}\label{eq:M}
+  M = \mathrm{diag}\!\left(1,\, 1-\delta,\, 1-2\delta,\, \ldots,\, 1/\mathrm{cn}\right),
+\end{equation}
+where $\delta = \frac{1 - 1/\mathrm{cn}}{n-1}$.
+
+The geometry of $f$ does not change
+as $\mathrm{cn}$ varies: the problem remains strict-saddle for any 
+$\mathrm{cn} \geq 1$. What changes is the local conditioning at the 
+minimizer (Hessian condition number $\approx \mathrm{cn}$), and hence 
+the rate at which gradient methods converge in Regime~3.
+
+\subsection{Fixed parameters}
+
+Unless stated otherwise, the following values are used throughout:
+\[
+  \Ltwo = 20,\quad
+  \sigma = 0.01,\quad
+  \kappa = 100,\quad
+  \eta = 10^{-2},\quad
+  \theta = 0.5,\quad
+  \epsg = 10^{-7},\quad
+  \epsH = 10^{-3},\quad
+  \zeta = 0.1.
+\]
+The threshold $\zeta$ is used only for color-labeling plots (Regime~1 vs.\ Regime~3); it does not affect the algorithm.
+
+\subsection{What varies}\label{subsec:axes}
+
+The experimental setup is the following:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Conditioning} $\mathrm{cn} \in \{1, 10, 100\}$ (and additional values in the appendix).
+  \item \textbf{Conjugate-direction formula} $\beta \in \{\text{PRP+}, \text{HZ}, \text{FR}\}$.
+  \item \textbf{Restart-condition tightness} $(\sigma, \kappa) \in \{(0.1, 2),\, (0.01, 100)\}$.
+  % \item \textbf{Problem dimensions} $(n, r) \in \{(5, 5), (5, 1)\}$.
+\end{itemize}
+For each combination of these four parameters, five $(p, q)$ sweeps 
+are performed: an \emph{extreme-configurations} sweep covering 
+$(p, q) \in \{(0,0), (0.5,1), (1,1), (2,1.5), (5,3), (5,10), (10,5)\}$, 
+plus sweeps that vary $p$ at fixed $q$ or vice versa.
+
+\subsection{Featured cell for detailed analysis}\label{subsec:featured}
+
+The bulk of Sections~\ref{sec:cn} and~\ref{sec:pq} uses the configuration:
+\[
+  \beta = \text{PRP+}, \quad
+  \sigma = 0.01, \quad
+  \kappa = 100, \quad
+  n = r = 5,
+\]
+with $\mathrm{cn}$ varying for Section~\ref{sec:cn} and $\mathrm{cn} = 10$ 
+fixed for the deep dive in Section~\ref{sec:pq}. 
+We also show comparisons across $\beta$ and restart tightness
+in Section~\ref{sec:beta}.
+
+\subsection{Initialization}
+
+All runs starting from a fixed configuration share the same initial point 
+$x_0 = 0.05 \cdot \xi$, where $\xi$ is a fixed vector of i.i.d.\ 
+standard Gaussian entries. The starting point is voluntarily close to the strict 
+saddle $X = 0$ in order to observe the escape capabilities of the algorithm.
+
+% ============================================================
+\section{NCG versus GD as a function of conditioning}\label{sec:cn}
+% ============================================================
+
+This section presents the central empirical finding: 
+\emph{the gap between NCG and GD widens as the problem becomes more ill-conditioned}. 
+We sweep the condition number $\mathrm{cn}$ of $M$ across three values 
+and observe how the rate-comparison plots change.
+
+All plots in this section use 
+$\beta = \text{PRP+}$, $\sigma = 0.01$, $\kappa = 100$, $n = r = 5$.
+
+\subsection{$\mathrm{cn} = 1$: NCG is worst than GD}\label{subsec:cn1}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\cellcni/exp1_extremes__rates.png}
+  \caption{Rate comparison on the well-conditioned problem
+    ($\mathrm{cn} = 1$, $M = I_5$). All seven $(p, q)$ configurations 
+    terminate in either 12 or 14 iterations, worst than GD (dashed) which 
+    terminates in 11 iterations.}
+  \label{fig:cn1-rates}
+\end{figure}
+
+At $\mathrm{cn} = 1$, the Hessian at the minimizer is isotropic 
+(all eigenvalues equal). Conjugate-direction updates produce essentially no 
+meaningful search directions, so NCG gets to improve only by restarting
+and following GD. The bound the theory establishes for NCG matches the bound it
+establishes for GD here, and no $(p, q)$ choice produces a 
+meaningfully different trajectory.
+
+This shows a property of the algorithm:
+the matrix-factorization geometry with $M = I_n$ provides no anisotropy 
+for the conjugate update to exploit.
+
+\subsection{$\mathrm{cn} = 10$ and $\mathrm{cn} = 100$: NCG beats GD across most configurations}\label{subsec:cn10_cn100}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\cellcnten/exp1_extremes__rates.png}
+  \caption{Rate comparison at $\mathrm{cn} = 10$. The NCG configurations 
+  now spread across a range of iteration counts; the fastest 
+  with 62 iterations $(p=2, q=1.5)$ beats GD by a factor of 
+  $\sim$$19$.}
+  \label{fig:cn10-rates}
+\end{figure}
+
+With $\mathrm{cn} = 10$, the Hessian at the minimum has eigenvalues 
+spread by a factor of $10$. Figure~\ref{fig:cn10-rates} shows that the NCG lines are 
+decreasing faster than GD in early iterations as the conjugate direction 
+gets exploited. The conjugate direction now points meaningfully 
+off the gradient direction, and the algorithm exploits this to take more 
+informative steps. NCG begins to realize its theoretical advantage over GD.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\cellcnhundred/exp1_extremes__rates.png}
+  \caption{Rate comparison at $\mathrm{cn} = 100$. Most NCG configurations 
+  beat GD; the fastest $(p=1, q=1)$ is twice as fast as GD. 
+  The slowest configurations overlap with GD.}
+  \label{fig:cn100-rates}
+\end{figure}
+
+With $\mathrm{cn} = 100$ (Figure~\ref{fig:cn100-rates}) the gap between NCG and GD is significant for 
+the $(p=1, q=1)$ configuration, and still meaningful for all other configurations.
+
+\subsection{Synthesis: the gap scales with conditioning}\label{subsec:cn-synth}
+
+Combining the three subsections:
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+$\mathrm{cn}$ & GD iters & NCG (best) iters & speed-up \\
+\midrule
+1   & 11 & 12 & -1 \\
+10  & 81 & 62 & 19 \\
+100 & 721 & 339 & 382 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{observation}[NCG-GD separation]\label{obs:ncg-gd}
+On the family of test problems~\eqref{eq:matfact}--\eqref{eq:M}, the
+NCG-versus-GD speed-up grows with $\mathrm{cn}$. 
+At $\mathrm{cn} = 1$ the two methods are indistinguishable; at 
+$\mathrm{cn} = 100$ the best NCG configuration is faster than GD by a 
+factor of 2.
+\end{observation}
+
+\paragraph{Comparison with theory.}
+The theoretical complexity bound predicts a Regime~3 iteration count 
+proportional to $\log(1/\epsg)$ at favorable parameters ($R < 1$) 
+and to $\epsg^{-2(R-1)}$ otherwise. The bound contains $\gamma$ and 
+$L_1$ (the strong-convexity and gradient-Lipschitz constants), with 
+$\gamma \approx \lambda_{\min}(M) \approx 1/\mathrm{cn}$ on our test 
+problem. Substituting empirical estimates yields a loose prediction 
+that overestimates the iteration count, but reproduces the scaling.
+The bound is therefore correct in form but conservative in constants, a 
+recurring observation throughout the experiments.
+
+The theoretical bounds also predict an iteration count proportional to
+$\epsg^{-2(R-1)}$ for the unfavorable parameters yeilding $R > 1$. We do not
+observe any bound of this order in the experiments. Actually, the case $R<1$ is
+the best one in our setup. The bound still holds since this is a worst-case one,
+but empirical results show that it is very loose and that the order of magnitude
+of the decrease in iteration count is substantially higher than predicted by theory. 
+
+% ============================================================
+\section{Effect of $(p, q)$: a deep dive at $\mathrm{cn} = 10$}\label{sec:pq}
+% ============================================================
+
+Having established (Section~\ref{sec:cn}) that NCG outperforms GD at non-trivial conditioning, we now ask: \emph{which $(p, q)$ values produce this outperformance, and is the theoretical asymptotic exponent $R$ predictive?}
+
+\paragraph{Scope of this section.}
+All plots use $\beta = \text{PRP+}$, $\sigma = 0.01$, $\kappa = 100$, $n = r = 5$, $\mathrm{cn} = 10$. The choice of $\mathrm{cn} = 10$ for the deep dive (rather than $\mathrm{cn} = 100$) is deliberate: at moderate conditioning, the dependence on $(p, q)$ is richer and less compressed by the extreme dominance of conditioning effects.
+
+\subsection{Extreme configurations}\label{subsec:pq-extreme}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\featuredcell/exp1_extremes__rates.png}
+  \caption{Rate comparison on the featured cell with seven extreme $(p, q)$ configurations. The legend shows $R$ and total restart count per configuration.}
+  \label{fig:pq-extreme}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\featuredcell/exp1_extremes__restarts.png}
+  \caption{Restart frequency per configuration, decomposed by which restart condition of~\eqref{eq:restart} triggered.}
+  \label{fig:pq-extreme-restarts}
+\end{figure}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=2em]
+  \item Iteration counts span $62$--$81$.
+  \item The fastest configuration is $(p, q) = (2, 1.5)$ with $R = 1.5$.
+  \item The slowest configuration is $(p, q) = (5, 10)$ with $R = 3$.
+  \item Restart counts vary from $40$ to $78$; condition~(a) dominates for $(p, q)$ with small $q$, condition~(b) for large $q$.
+\end{itemize}
+
+\paragraph{Interpretation.}
+The dependence of iteration count on $(p, q)$ is non-monotone in $R$. 
+For example, for $(p,q) = (2, 1.5)$ (which gives $R=1.5$), we get a faster convergence than for $(p,q) = (0.5,1)$ (which gives $R = 0.75$).
+However, theory predicts a better convergence rate for $R < 1$ than $R>1$. We get
+the opposite behaviour empirically than what theory predicts.
+
+\subsection{$q = 1$ fixed, varying $p$}\label{subsec:pq-2a}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\featuredcell/exp2a_q1_vary_p__rates.png}
+  \caption{Rate comparison with $q = 1$ fixed and $p \in \{0, 0.5, 1, 1.5, 2, 3, 5\}$. As $p$ varies, the asymptotic exponent $R$ varies as $\max((1+p)/2, 1+p-q)$.}
+  \label{fig:sweep-2a}
+\end{figure}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=2em]
+  \item Iteration counts span $64$--$75$
+  \item All instances beat GD
+  \item 5 configurations overlap: for $p \geq q$, we get the same iteration count, which is the slowest. This is interesting, shows that the actual value of p (and R) is not very important here. The relationship between $q$ and $p$ is what drives the iterations count.
+\end{itemize}
+
+\paragraph{Interpretation.}
+To write from the observations, but overall, dependence again is 
+not monotone in R, and actually doesn't even look like it depends on R. 
+It depends on the relationship between p and q.
+
+\subsection{$p = 1$ fixed, varying $q$}\label{subsec:pq-3a}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\featuredcell/exp3a_p1_vary_q__rates.png}
+  \caption{Rate comparison with $p = 1$ fixed and $q \in \{0, 0.5, 1, 1.5, 2, 3, 5\}$. The exponent $R = \max(1, 2 - q)$, so $R = 1$ for all $q \geq 1$.}
+  \label{fig:sweep-3a}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.85\linewidth]{\figroot/\featuredcell/exp3a_p1_vary_q__restarts.png}
+  \caption{Restart pattern for Sweep~3a. For $q \geq 1$, $R$ is constant at $1$, but the restart breakdown shifts from condition~(a)-dominated to condition~(b)-dominated as $q$ grows.}
+  \label{fig:sweep-3a-restarts}
+\end{figure}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=2em]
+  \item For $q \geq 1$ the theoretical $R = 1$ is constant, yet iteration counts vary by a factor of \textbf{[TODO: ?]}.
+  \item The restart breakdown shifts cleanly with $q$: \textbf{[TODO: describe]}.
+\end{itemize}
+
+\paragraph{Interpretation.}
+This sweep is the cleanest test of whether $R$ alone predicts performance: for $q \geq 1$ the theory predicts identical asymptotic rates, but the empirics show clear variation. The variation tracks restart frequency rather than $R$.
+
+\subsection{Synthesis: $R$ is necessary but not sufficient}\label{subsec:pq-synth}
+
+\begin{observation}[$R$ does not predict iteration count]\label{obs:R-not-predictive}
+Configurations with identical theoretical $R$ exhibit empirical iteration 
+counts that differ by factors of $1.5$--$2$ on the featured cell. 
+The variation correlates more strongly with restart frequency than with $R$.
+\end{observation}
+
+\paragraph{Why restart frequency matters.}
+The restart conditions~\eqref{eq:restart} reset the conjugate direction 
+to $-g_k$ whenever the conjugate update has produced a poor descent direction. 
+Configurations that restart rarely accumulate direction drift; configurations 
+that restart frequently effectively re-anchor on the gradient and behave 
+closer to GD. The empirical sweet spot is intermediate restart frequency: 
+enough to prevent drift, not so much that the conjugate update is undone.
+Since the restart frequency has a heavy weight in the iteration count, and that
+restarts happen more or less depending on the relationship between $p$ and $q$,
+we also see in some figures that the relationship between $p$ and $q$ can be a
+more important factor than the actual value of $R$.
+
+This is a finding that the current theory does not predict: the theoretical 
+bound is independent of restart frequency by design (the analysis treats 
+restart steps and non-restart steps separately and sums their contributions), 
+but empirically the distribution of restart steps across the trajectory
+matters.
+
+% ============================================================
+\section{Effect of the conjugate-direction formula}\label{sec:beta}
+% ============================================================
+
+The theoretical bound is $\beta$-agnostic: the restart conditions ensure
+descent regardless of which $\beta$ formula is used. This section asks 
+whether $\beta$ matters in practice.
+
+\subsection{Three formulas at the featured cell}\label{subsec:beta-three}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}{0.32\linewidth}
+    \includegraphics[width=\linewidth]{\figroot/\cellbetaPRP/exp1_extremes__rates.png}
+    \caption{PRP+}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.32\linewidth}
+    \includegraphics[width=\linewidth]{\figroot/\cellbetaHZ/exp1_extremes__rates.png}
+    \caption{HZ}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.32\linewidth}
+    \includegraphics[width=\linewidth]{\figroot/\cellbetaFR/exp1_extremes__rates.png}
+    \caption{FR}
+  \end{subfigure}
+  \caption{Extreme-configurations sweep under three $\beta$ formulas with loose restart conditions ($\sigma = 0.01$, $\kappa = 100$, $\mathrm{cn} = 10$).}
+  \label{fig:beta-loose}
+\end{figure}
+
+\paragraph{Observations.}
+
+% % ============================================================
+% \section{Effect of dimension}\label{sec:dim}
+% % ============================================================
+
+% We briefly compare the $n = r = 5$ case (a $25$-dimensional problem) with the $n = 5$, $r = 1$ case (a $5$-dimensional problem). The latter has rank-$1$ approximation of $M$ rather than full-rank, which changes the structure of minimizers (a sphere of radius $\sqrt{\sigma_{\max}(M)}$ rather than a continuum).
+
+% \begin{figure}[h!]
+%   \centering
+%   \begin{subfigure}{0.49\linewidth}
+%     \includegraphics[width=\linewidth]{\figroot/\celldimlarge/exp1_extremes__rates.png}
+%     \caption{$n = r = 5$ (full-rank)}
+%   \end{subfigure}\hfill
+%   \begin{subfigure}{0.49\linewidth}
+%     \includegraphics[width=\linewidth]{\figroot/\celldimsmall/exp1_extremes__rates.png}
+%     \caption{$n = 5$, $r = 1$ (rank-$1$)}
+%   \end{subfigure}
+%   \caption{Rate comparison across dimensions, with PRP+, $\sigma = 0.1$, $\kappa = 2$, $\mathrm{cn} = 10$.}
+%   \label{fig:dim}
+% \end{figure}
+
+% \paragraph{Observations.}
+% \textbf{[TODO: 2--3 observations. Likely points: rank-$1$ case may converge faster due to lower-dimensional search; or it may converge slower because the saddle is harder to escape (Hessian at $X = 0$ is uniformly negative-definite for rank-$1$, so the negative-curvature step is more delicate); or it may show a regime~2 step that does not appear at full rank.]}
+
+% ============================================================
+\section{Discussion}\label{sec:discussion}
+% ============================================================
+
+\subsection{What the experiments validate}\label{subsec:disc-validate}
+
+The experiments confirm the qualitative claims of the theory:
+\begin{itemize}[leftmargin=2em]
+  \item Convergence to an approximate second-order stationary point from a near-saddle initialization is observed in all cells tested.
+  \item Convergence accelerates on entry into Regime~3 (transition from blue to green dots in trajectory plots), consistent with the per-regime decomposition of the bound. \textbf{I do not show any of those plots here, should I ? Is it an interesting and important finding?}
+  \item Restart steps are used and do contribute to the iteration count; the $\beta$-agnostic structure of the bound is consistent with the empirical observation that any $\beta$ formula works \emph{when the restart conditions are appropriate}. However, the speed of convergence is largely affected by the $\beta$ formula used.
+\end{itemize}
+
+We also observe empirically that NCG increasingly beats GD as the conditioning worsens.
+
+\subsection{What the experiments do not validate}\label{subsec:disc-not-validate}
+
+The theoretical bound is loose. Empirical iteration counts are typically orders of magnitude smaller than the bound predicts, because the constants $c_\setN$ and $c_\setR$ are conservative under worst-case stepsize and direction assumptions. Moreover, the bound considers the full iteration budget to be used in each regime, whereas only a fraction of it is used empirically.
+
+This looseness has two practical consequences:
+\begin{enumerate}[leftmargin=2em]
+  \item The theory cannot be used quantitatively for parameter selection. Choosing $(p, q)$ to minimize $R$ is not the same as choosing $(p, q)$ for fast empirical convergence (Observation~\ref{obs:R-not-predictive}).
+  \item The theoretical curves are not useful as overlays on the empirical plots: they lie far above the actual trajectories. We have therefore omitted them from this document.
+\end{enumerate}
+
+\subsection{Open questions}\label{subsec:disc-open}
+
+The experiments suggest two empirical phenomena that the current theory does not predict and that would be worth analyzing:
+\begin{enumerate}[leftmargin=2em]
+  \item \emph{Restart frequency.} A refined analysis tracking restart frequency as a function of $(p, q, \beta)$ would likely yield a tighter bound. The current analysis treats restart and non-restart steps in isolation; a careful analysis of \emph{how often} restarts occur would close the gap between bound and observation.
+  \item \emph{$\beta$-specific bounds.} The $\beta$-agnostic bound is achievable because the restart condition acts as a worst-case safety net. A $\beta$-specific bound for PRP+ and HZ would presumably yield tighter constants, and a $\beta$-specific bound for FR would presumably require tighter restart conditions to maintain convergence guarantees.
+\end{enumerate}
+
+\subsection{Limitations}\label{subsec:disc-limits}
+
+\begin{itemize}[leftmargin=2em]
+  \item All experiments use a single (random) starting point. The dependence of iteration count on initialization is not characterized.
+  \item Only one family of test problems is considered. Generalization to other strict-saddle problems is an open empirical question.
+  \item No comparison is made to alternative saddle-escape algorithms (perturbed gradient methods, trust-region methods, cubic regularization). The relative comparison with GD provides a baseline but does not place the algorithm in the broader landscape.
+  \item Both the lipschitz and strong convexity constants are estimated numerically as the highest and lowest eigenvalues of the hessian respectively. While this is fine for our task at hand, it is not a rigorous way to find it and constitutes a limitation of our empirical experiments.
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
