@@ -1,0 +1,2561 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{booktabs}
+
+% --- Theorem environments (each with its own counter so cleveref works) ---
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{remark}{Remark}
+
+\crefname{theorem}{Theorem}{Theorems}
+\Crefname{theorem}{Theorem}{Theorems}
+\crefname{proposition}{Proposition}{Propositions}
+\Crefname{proposition}{Proposition}{Propositions}
+\crefname{lemma}{Lemma}{Lemmas}
+\Crefname{lemma}{Lemma}{Lemmas}
+\crefname{corollary}{Corollary}{Corollaries}
+\Crefname{corollary}{Corollary}{Corollaries}
+\crefname{definition}{Definition}{Definitions}
+\Crefname{definition}{Definition}{Definitions}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+\crefname{remark}{Remark}{Remarks}
+\Crefname{remark}{Remark}{Remarks}
+
+%-----------------------------------------------------------------
+% Macros
+%-----------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\inner}[2]{\left\langle #1,#2 \right\rangle}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\epsg}{\eps_{g}}
+\newcommand{\epsH}{\eps_{H}}
+\newcommand{\grad}{\nabla}
+\newcommand{\hess}{\nabla^{2}}
+\newcommand{\xstar}{x^{\star}}
+\newcommand{\fstar}{f^{\star}}
+\newcommand{\flow}{f_{\mathrm{low}}}
+\newcommand{\Lone}{L_{1}}
+\newcommand{\Ltwo}{L_{2}}
+\newcommand{\setN}{\mathcal{N}}
+\newcommand{\setR}{\mathcal{R}}
+\newcommand{\cN}{c_{\setN}}
+\newcommand{\cR}{c_{\setR}}
+\newcommand{\Tp}{T_{\mathrm{perturb}}}
+\newcommand{\Fthresh}{F_{\mathrm{thresh}}}
+\newcommand{\tnoise}{t_{\mathrm{noise}}}
+\newcommand{\snap}{\tilde{x}}
+\newcommand{\fsnap}{\hat{f}}
+\renewcommand{\d}{d}
+\newcommand{\vmin}{v_{\min}}
+\newcommand{\lmin}{\lambda_{\min}}
+\newcommand{\sdel}{s_{\delta}}
+\newcommand{\glow}{\underline{g}}
+\renewcommand{\Pr}{\mathbb{P}}
+\newcommand{\indic}[1]{\mathbf{1}_{\{#1\}}}
+\newcommand{\proofpara}[1]{\par\medskip\noindent\textbf{#1}\quad}
+\newcommand{\defeq}{\mathrel{\vcentcolon=}}
+% --- Macros for the complexity analysis (Step IX) ---
+\newcommand{\LL}{\mathcal{L}}                
+\newcommand{\Rstar}{R^{*}}
+\newcommand{\gup}{\bar g}
+\newcommand{\bbeta}{\bar\beta}
+\newcommand{\Niter}{N_{\mathrm{iter}}}
+\newcommand{\Ntrig}{N_{\mathrm{trig}}}
+\newcommand{\serr}{\sigma_{\mathrm{err}}}
+\newcommand{\smom}{\sigma_{\mathrm{mom}}}
+\newcommand{\tstar}{t_\star}
+\newcommand{\thetamin}{\theta''_{\min}}
+\newcommand{\amin}{\alpha_{\min}}
+
+\title{Non-linear Conjugate Gradient With Restart Also Escapes Saddle Points\\
+\large Working document --- full proofs and rationale}
+\author{Benjamin S\'eguin, Cl\'ement Royer \\ \small LAMSADE}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study a perturbed, restarted variant of the non-linear conjugate gradient (NCG)
+method and show that, like perturbed gradient descent, it escapes strict saddle
+points and converges to an approximate second-order stationary point. The analysis
+combines per-step decrease guarantees, an improve-or-localize argument valid for both
+restarted and non-restarted iterations, a linearization of the dynamics around the
+snapshot point, an anti-concentration estimate for the random perturbation, an
+induction maintaining three coupled invariants over the escape window, and a
+contradiction argument converting geometric growth into guaranteed function decrease.
+A final section resolves the resulting constraint system exactly and derives the
+complexity bound, together with its current limitations.
+\end{abstract}
+
+\tableofcontents
+
+% ============================================================
+\section{Introduction}\label{sec:intro}
+We follow the framework of \cite{pmlr-v70-jin17a} and \cite{pmlr-v75-jin18a} and
+adapt it to the non-linear conjugate gradient method with restart, in order to show
+that this method also escapes strict saddle points and produces an approximate
+second-order stationary point. The starting point for the descent estimates is the
+NCG complexity analysis of \cite{RoyerChan2022}; the saddle-avoidance
+mechanism is borrowed, at a high level, from the perturbed gradient descent analyses of
+\cite{pmlr-v70-jin17a,pmlr-v75-jin18a} and from the dynamical-systems viewpoint of
+\cite{lee2019}. Our setup is comparable to the one of~\cite{pmlr-v75-jin18a}, since
+NCG is a momentum method, just like accelerated gradient descent (AGD).
+However, we depart from their proof technique by studying a \emph{single trajectory},
+whereas they study two coupled trajectories of the same process and conclude from
+the growth of their difference.
+
+The document is organized around the proof story of \Cref{sec:roadmap}: nine steps,
+each with a one-paragraph rationale (\emph{what} it establishes, \emph{why} the
+argument needs it, and \emph{where} it is consumed), followed by the corresponding
+section with full proofs.
+
+\section{Preliminaries}\label{sec:prelim}
+In this section, we introduce our notation, and present the definitions, assumptions,
+and elementary consequences used throughout this document.
+
+\subsection{Notation}
+For vectors, we use
+$\norm{\cdot}$ to denote the $\ell_2$-norm. We use $\lambda_{\max}(\cdot)$ and
+$\lambda_{\min}(\cdot)$ to denote the largest and smallest eigenvalues respectively.
+For a function $f \colon \R^{d} \to \R$, we use $\grad f(\cdot)$ and $\hess f(\cdot)$ to
+denote its gradient and Hessian, and $\fstar$ to denote the global minimum of $f$. We
+let $\mathcal{B}^{d}(x, r)$ denote the $d$-dimensional ball centered at $x$ with radius
+$r$, and $\mathcal{U}(S)$ the uniform distribution over a set $S$.
+
+\subsection{Setting}
+We consider the unconstrained minimization problem
+\begin{equation}\label{eq:problem}
+\min_{x \in \R^{d}} f(x),
+\end{equation}
+where $f \colon \R^{d} \to \R$ is nonconvex and whose saddle points are strict.
+
+\begin{definition}[Strict saddle point]\label{def:strictsaddle}
+A strict saddle point is a saddle point $\xstar$ that has at least one direction of
+negative curvature, that is,
+\begin{equation}
+\lambda_{\min}\!\big(\hess f(\xstar)\big) < 0 .
+\end{equation}
+\end{definition}
+
+\noindent The algorithm certifies approximate second-order stationarity in the following sense.
+
+\begin{definition}[Approximate second-order stationary point]\label{def:2osp}
+Given tolerances $\epsg, \epsH > 0$, a point $x \in \R^{d}$ is an
+$(\epsg, \epsH)$-second-order stationary point (SOSP) if
+\begin{equation}\label{eq:2osp}
+\norm{\grad f(x)} \leq \epsg
+\qquad\text{and}\qquad
+\lambda_{\min}\!\big(\hess f(x)\big) \geq -\epsH .
+\end{equation}
+\end{definition}
+
+\noindent We make the following standing assumptions.
+
+\begin{assumption}[Gradient Lipschitz]\label{ass:gradlip}
+The function $f$ is continuously differentiable on $\R^{d}$, and its gradient $\grad f$
+is $\Lone$-Lipschitz continuous, with $\Lone > 0$.
+\end{assumption}
+
+\begin{assumption}[Hessian Lipschitz]\label{ass:hesslip}
+The function $f$ is twice continuously differentiable on $\R^{d}$, and its Hessian
+$\hess f$ is $\Ltwo$-Lipschitz continuous, with $\Ltwo > 0$.
+\end{assumption}
+
+\subsection{Elementary consequences of the assumptions}
+
+Both consequences below are used repeatedly; we record them once with full proofs.
+
+\begin{lemma}[Descent lemma]\label{lem:descent}
+Under \Cref{ass:gradlip}, for all $x, y \in \R^d$,
+\begin{equation}\label{eq:descent}
+f(y) \;\le\; f(x) + \grad f(x)^{\top}(y-x) + \frac{\Lone}{2}\norm{y-x}^{2}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Let $\varphi(t) := f\bigl(x + t(y-x)\bigr)$ for $t\in[0,1]$, so that
+$\varphi'(t) = \grad f\bigl(x+t(y-x)\bigr)^{\top}(y-x)$. By the fundamental theorem of
+calculus,
+\[
+f(y) - f(x)
+= \int_{0}^{1}\varphi'(t)\,dt
+= \grad f(x)^{\top}(y-x)
+  + \int_{0}^{1}\bigl(\grad f(x+t(y-x)) - \grad f(x)\bigr)^{\top}(y-x)\,dt .
+\]
+By Cauchy--Schwarz and \Cref{ass:gradlip}, the integrand is bounded by
+$\Lone t \norm{y-x}^{2}$, and $\int_{0}^{1}\Lone t\,dt = \Lone/2$, giving
+\eqref{eq:descent}.
+\end{proof}
+
+\begin{lemma}[Spectral bound on the Hessian]\label{lem:hessbound}
+Under \Cref{ass:gradlip,ass:hesslip}, for every $x\in\R^{d}$,
+$\norm{\hess f(x)} \le \Lone$; in particular
+$\lambda_{\min}(\hess f(x)) \ge -\Lone$ everywhere.
+\end{lemma}
+
+\begin{proof}
+Fix $x$ and a unit vector $v$. By \Cref{ass:gradlip},
+$\norm{\grad f(x+tv) - \grad f(x)} \le \Lone |t|$ for all $t$, so
+\[
+\norm{\hess f(x)\,v}
+= \lim_{t\to 0}\frac{\norm{\grad f(x+tv)-\grad f(x)}}{|t|}
+\le \Lone .
+\]
+Taking the supremum over unit $v$ gives $\norm{\hess f(x)}\le\Lone$; since
+$\hess f(x)$ is symmetric, all its eigenvalues lie in $[-\Lone,\Lone]$.
+\end{proof}
+
+\begin{remark}[Meaningful range of $\epsH$]\label{rem:epsH-range}
+By \Cref{lem:hessbound}, the curvature condition
+$\lambda_{\min}(\hess f(x)) \le -\epsH$ can hold at \emph{some} point only if
+$\epsH \le \Lone$. For $\epsH > \Lone$ the perturbation trigger of
+\Cref{algo:PNCG} can never fire and the SOSP certificate \eqref{eq:2osp} holds
+automatically at every $\epsg$-stationary point. This elementary observation
+becomes important when solving the constraints system.
+% reading the regime restriction of Step~IX; see
+% \Cref{rem:vacuity}.
+\end{remark}
+
+% ============================================================
+\section{The Perturbed Restarted NCG Algorithm}\label{sec:algo}
+
+We present a perturbed variant of the NCG method with
+restart, analogous to the perturbed gradient descent of \cite{pmlr-v70-jin17a}. The
+algorithm augments the usual NCG iteration with four ingredients absent from the plain
+method: a perturbation radius $r$, an escape window $\Tp$, a function-value progress
+threshold $\Fthresh$, and a target failure probability $\delta$. The idea is
+straightforward: when the norm of the current gradient is small ($\norm{g_k} \leq
+\epsg$), the current point is a candidate SOSP, and a random
+perturbation is injected to test whether it is a SOSP or a
+strict saddle point.
+
+\begin{algorithm}[H]
+\caption{Perturbed Restarted Non-linear Conjugate Gradient (PR-NCG)}\label{algo:PNCG}
+\begin{algorithmic}[1]
+\Require $x_{0} \in \R^{d}$; NCG parameters $\sigma \in (0,1]$, $\kappa \geq 1$,
+  $p \geq 0$, $q \geq 0$; tolerances $\epsg > 0$, $\epsH > 0$; perturbation radius
+  $r > 0$, escape window $\Tp \in \N$, progress threshold $\Fthresh > 0$, failure
+  probability $\delta \in (0,1)$.
+\State $g_{0} \gets \grad f(x_{0})$,\quad $d_{0} \gets -g_{0}$
+\State $\tnoise \gets -\Tp - 1$ \Comment{allows an immediate perturbation}
+\State $\snap \gets x_{0}$,\quad $\fsnap \gets f(x_{0})$ \Comment{last snapshot}
+\For{$k = 0, 1, 2, \dots$}
+  \State $g_{k} \gets \grad f(x_{k})$
+  \If{$\norm{g_{k}} \leq \epsg$ \textbf{ and } $k - \tnoise > \Tp$}
+       \Comment{perturbation trigger (replaces NCD)}
+    \State $\snap \gets x_{k}$,\quad $\fsnap \gets f(x_{k})$ \Comment{save snapshot}
+    \State sample $\xi \sim \mathcal{U}\!\big(\mathcal{B}^{d}(0, r)\big)$
+    \State $x_{k} \gets x_{k} + \xi$
+    \State $g_{k} \gets \grad f(x_{k})$ \Comment{recompute after perturbation}
+    \State $d_{k} \gets -g_{k}$ \Comment{reset momentum}
+    \State $\tnoise \gets k$
+  \EndIf
+  \If{$k - \tnoise = \Tp$ \textbf{ and } $f(x_{k}) - \fsnap > -\Fthresh$}
+       \Comment{termination check}
+    \State \Return $\snap$ as an approximate $(\epsg, \epsH)$-2OSP
+  \EndIf
+  \Statex \quad\textit{/* NCG step */}
+    \If{$d_{k} = -g_{k}$} \Comment{restarted direction}
+    \State $\alpha_{k} \gets \alpha_{\setR}^{\ast} = 1/\Lone$
+  \Else
+    \State $\alpha_{k} \gets \alpha^{\ast}_{\setN}
+    = \dfrac{\sigma}{\Lone \kappa^{2}}\,\norm{g_{k}}^{\,1+p-2q}$
+  \EndIf
+  \State $x_{k+1} \gets x_{k} + \alpha_{k} d_{k}$
+  \State $g_{k+1} \gets \grad f(x_{k+1})$
+  \State choose $\beta_{k+1}$
+  \State $d_{k+1} \gets -g_{k+1} + \beta_{k+1} d_{k}$
+  \If{$g_{k+1}^{\top} d_{k+1} \geq -\sigma \norm{g_{k+1}}^{\,1+p}$
+       \textbf{ or } $\norm{d_{k+1}} \geq \kappa \norm{g_{k+1}}^{\,q}$}
+       \Comment{restart condition}
+    \State $d_{k+1} \gets -g_{k+1}$
+  \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+We write $\setN$ for the set of non-restarted iterations (the kept NCG direction
+satisfies $g_{k}^{\top}d_{k} < -\sigma\norm{g_k}^{1+p}$ and
+$\norm{d_k} < \kappa\norm{g_k}^{q}$, by the complement of the restart test) and
+$\setR$ for the restarted ones ($d_k = -g_k$).
+
+\begin{assumption}[Exponent matching]\label{ass:pq}
+Throughout the escape analysis we take $1+p = 2q$ with $q = 1$, i.e.\
+$p = q = 1$. Under this assumption the non-restarted stepsize is the
+\emph{constant}
+\[
+\alpha^{\ast}_{\setN} \;=\; \frac{\sigma}{\Lone\kappa^{2}},
+\qquad\text{with}\qquad
+\alpha^{\ast}_{\setN}\,\Lone \;=\; \frac{\sigma}{\kappa^{2}} \;\le\; 1 ,
+\]
+since $\sigma\le 1\le\kappa^{2}$. We write
+\begin{equation}\label{eq:amin}
+\amin \;:=\; \frac{\sigma}{\Lone\kappa^{2}},
+\qquad\text{so that every stepsize satisfies}\qquad
+\alpha_{k}\in\Bigl\{\amin,\ \tfrac{1}{\Lone}\Bigr\}\subset
+\Bigl[\amin,\ \tfrac{1}{\Lone}\Bigr],
+\quad \alpha_{k}\Lone\le 1 .
+\end{equation}
+The restart test then reads $\norm{d_{k+1}}\ge\kappa\norm{g_{k+1}}$ and
+$g_{k+1}^{\top}d_{k+1}\ge-\sigma\norm{g_{k+1}}^{2}$.
+\end{assumption}
+
+\begin{remark}[Changelog: removal of the in-window stepsize safeguard]
+\label{rem:safeguard-changelog}
+% NOTE (flagged correction, kept for the record):
+An earlier version of \Cref{algo:PNCG} had the stepsize at $\alpha=1/\Lone$
+inside the escape window, for \emph{all} directions. This created a third
+iteration type: NCG direction with $\alpha=1/\Lone$, which was covered by neither
+case of \Cref{lem:improve}, and for which the per-step decrease can
+fail: the descent lemma only gives
+$f(x_{k})-f(x_{k+1})\ge\tfrac{\sigma}{\Lone}\norm{g_{k}}^{1+p}
+-\tfrac{\kappa^{2}}{2\Lone}\norm{g_{k}}^{2q}$, whose sign is uncontrolled in
+general. Since \Cref{lem:localization} applies \Cref{lem:improve} to in-window
+steps, this was a gap.
+
+\emph{Resolution adopted.} Under \Cref{ass:pq} the stepsize
+$\alpha^{\ast}_{\setN}$ is constant, so the safeguard is unnecessary: the
+window runs the algorithm's ordinary stepsize rule, every in-window step is
+one of the two cases of \Cref{lem:improve} (restarted with $1/\Lone$, or
+non-restarted with $\alpha^{\ast}_{\setN}$), and the uniform constant
+$2/\Lone$ applies verbatim. The escape recurrence becomes variable-stepsize
+with $\alpha_{k}\in[\amin,1/\Lone]$; the growth rate is controlled by
+$\amin$, costing the absolute factor $\kappa^{2}/\sigma$ in $T$ and
+$\kappa^{4}/\sigma^{2}$ in $\Niter$, with no change to the
+$(\epsH,\d,\delta)$ dependence.
+
+\emph{Alternatives not adopted.} (a)~Keeping $\alpha=1/\Lone$ in-window and
+requiring $\kappa^{2}<2\sigma$ also restores a per-step bound, with the
+non-uniform constant $2c_{w}/\Lone$, $c_{w}=\kappa^{2}/(2\sigma-\kappa^{2})$;
+valid (localization only needs the maximum of the per-step constants), but it
+confines $(\sigma,\kappa)$ to $\kappa\in[1,\sqrt{2\sigma})$.
+(b)~For general $(p,q)$, the safeguard
+$\alpha_{k}=\min\{1/\Lone,\alpha^{\ast}_{\setN}\}$ restores the bound but
+makes the in-window growth rate depend on $\glow^{\,1+p-2q}$, degrading the
+final rate; not pursued.
+% TODO: if the general-(p,q) extension is ever needed, the natural route is a
+% Hamiltonian/potential argument a la Jin-Netrapalli-Jordan rather than (b).
+\end{remark}
+
+\subsection{Perturbation as a saddle detector}\label{sub:detector}
+The perturbation plays the role of a strict-saddle detector. The intuition is that when
+the gradient is small, we are at a candidate SOSP, and we perturb to get one of the
+following two conclusions:
+\begin{itemize}[leftmargin=*]
+  \item If we perturb a point close to a strict saddle and let the algorithm run, the
+  iterate moves a lot, because the negative-curvature direction amplifies the
+  perturbation exponentially, and the function value drops significantly.
+  \item If we perturb a point close to a local minimizer (a genuine SOSP) and let the
+  algorithm run, the iterate stays roughly the same and the function value stagnates.
+\end{itemize}
+Hence the test ``did $f$ drop substantially after the perturbation?'' answers the
+question ``was I at a strict saddle?''. This permits us to certify convergence to an SOSP
+without any explicit computation of the Hessian matrix:
+condition $\norm{g_{k}} \leq \epsg$ is trivial to check, while the curvature condition
+$\lambda_{\min}(\hess f(x_{k})) \geq -\epsH$ is certified \emph{without} an explicit
+Hessian computation, through the perturbation test described above.
+
+% ============================================================
+\section{Proof Story (How to Read This Document)}\label{sec:roadmap}
+
+The argument decomposes into nine steps. Steps~I--II are generic descent facts about
+the algorithm; Steps~III--VI build the toolbox for the near-saddle analysis; Step~VII
+is the heart of the proof (the induction); Step~VIII converts it into the escape
+theorem; Step~IX resolves the constants and counts iterations. For each step we
+record \emph{what} it establishes, \emph{why} the argument needs it, and
+\emph{where} it is proved.
+
+\paragraph{Step I --- Decrease lemmas (\Cref{sec:decrease}).}
+Basic: each regime (restarted, non-restarted) gives a per-step decrease guarantee,
+with the stepsize $\alpha$ chosen to make the decrease optimal in that regime.
+\emph{Why:} these are the raw material of every function-value accounting in the
+document, in particular of Step~II.
+
+\paragraph{Step II --- Improve or localize (\Cref{sec:improve}).}
+We prove
+\[
+\sum_{k=0}^{T-1}\norm{x_{k+1}-x_{k}}^{2}
+\;\le\; \frac{2}{\Lone}\bigl(f(x_{0})-f(x_{T})\bigr).
+\]
+There are two readings of this inequality.
+\emph{(1) Improve:} if the iterates have moved a lot (left-hand side large), the
+function value must have dropped a lot (right-hand side large).
+\emph{(2) Localize:} if the function value has not dropped much (small right-hand
+side), the iterates cannot have moved much (small left-hand side).
+This is a dichotomy: at any moment, either we have improved by a meaningful amount,
+or we are stuck near where we started.
+\emph{Why:} the entire escape proof works inside the \emph{localize} branch and
+derives a contradiction there; the dichotomy then forces the \emph{improve} branch.
+
+\paragraph{Step III --- Linearization around $\snap$ (\Cref{sub:linearization}).}
+Here we linearize in order to perform a spectral analysis (i.e.\ get a linear system
+and compute eigenvalues). The whole idea is to show that the system has an eigenvalue
+$\mu_{+}>1$: since the element of study is $u_{k}=x_{k}-\snap$, if $\mu_{+}>1$, the
+iterate escapes the stationary point along the negative-curvature direction. We let
+$c_{k}:=\inner{u_{k}}{\vmin}$ and study its recurrence to get geometric growth. The
+recurrence is
+\[
+|c_{k+1}| \;\ge\; (1+\alpha\epsH)\,|c_{k}|
+\;-\; \alpha\,\beta_{k}|\eta_{k}| \;-\; \alpha\,\epsg \;-\; \alpha\norm{\tilde e_{k}},
+\]
+with $\eta_{k}=\inner{d_{k-1}}{\vmin}$ a momentum term and
+$\tilde e_{k}=\grad f(x_{k})-g_{\snap}-H(x_{k}-\snap)$ an error term. The rest of the
+proof exists to control the other terms in the recurrence (momentum and quadratic
+error) and to show that escaping along negative curvature has high probability.
+
+\paragraph{Step IV --- Quadratic model error (\Cref{sub:graderror-section}).}
+Straightforward: bound $\norm{\tilde e_{k}}$ above, which corresponds to the error
+between the real gradient and the quadratically approximated one.
+\emph{Why:} the recurrence of Step~III is only useful if this error cannot cancel
+the geometric push.
+
+\paragraph{Step V --- Probabilistic anti-concentration (\Cref{sub:anticonc}).}
+Also a straightforward step. The idea is to show that the perturbation has a
+non-negligible component along the negative-curvature direction, with high
+probability. \emph{Why:} the geometric growth $|c_{k}|\gtrsim\mu_{+}^{k}|c_{0}|$ is
+vacuous if $|c_{0}|$ is zero or tiny; this step supplies the initial signal
+$|c_{0}|\ge\sdel$.
+
+\paragraph{Step VI --- Lower bound on $\glow$ (Fletcher--Reeves specific)
+(\Cref{sub:gfloor}).}
+This step exists to control the momentum term. Since
+$\beta^{\mathrm{FR}}_{k}=\norm{g_{k}}^{2}/\norm{g_{k-1}}^{2}$, we have to bound
+$\beta^{\mathrm{FR}}\le \gup^{2}/\glow^{2}$, which requires a \emph{lower} bound on
+gradient norms. Any other $\beta$ formula would mean redoing this step; heavy ball or
+Nesterov do not need it, because their momentum coefficient is constant.
+\emph{Why:} this is the FR-specific price of the analysis, and the source of the
+final regime restriction.
+
+\paragraph{Step VII --- Induction for geometric growth (\Cref{ssec:induction}).}
+We want $|c_{k}|\ge(1+\gamma\alpha\epsH)^{k}|c_{0}|$. The issue is that the obstacle
+terms in the recurrence depend on the past:
+$\norm{\tilde e_{k}}\le\tfrac{\Ltwo}{2}\norm{u_{k}}^{2}$ depends on
+$u_{k}=x_{k}-\snap$; $\beta_{k}$ depends on $\norm{g_{k-1}}$;
+$|\eta_{k}|=|\inner{d_{k-1}}{\vmin}|$ depends on previous directions.
+The solution is an induction, which lets us maintain a set of properties
+simultaneously up to time $k$ and prove them at time $k+1$. From the recurrence, the
+three things we need are: (1) how far the iterate is
+($\norm{x_{k}-\snap}\le\dots$); (2) how big the gradient is
+($\norm{g_{k}}\ge\glow$); (3) how big $|c_{k}|$ is ($|c_{k}|\ge\dots|c_{0}|$).
+The whole idea is then driven by improve-or-localize:
+\emph{(a)} the function value drops by at least $F$ somewhere in $\{0,\dots,T\}$:
+this is what we try to prove;
+\emph{(b)} the function value never drops by that much, in which case Step~II tells
+us the iterates stay close to $x_{0}$
+($\norm{x_{k}-x_{0}}\le S$, $S=\sqrt{2FT/\Lone}$).
+We work in case~(b) and derive a contradiction, so we must be in case~(a). Case~(b)
+is the bad case and we formalize it by the localization event
+$\mathcal{L}_{T}=\{\max_{0\le k\le T}(f(x_{0})-f(x_{k}))<F\}$.
+
+\paragraph{Step VIII --- Escape theorem (\Cref{sub:escape}).}
+Using invariant~(3) of the induction, show
+$|c_{T}|\ge(1+\gamma\alpha\epsH)^{T}\sdel$, and using invariant~(1),
+$|c_{T}|\le\norm{u_{T}}\le S+\Rstar$. For a suitable $T$,
+$(1+\gamma\alpha\epsH)^{T}\sdel > S+\Rstar$: we have the contradiction
+$|c_{T}|\le S+\Rstar$ and $|c_{T}|>S+\Rstar$. Hence
+$\mathcal{G}_{0}\cap\mathcal{L}_{T}=\emptyset$ (since we have been conditioning on
+$\mathcal{G}_{0}$). This means we are in the first case of improve-or-localize, and
+the function value drops by at least $F$ within the escape window with high
+probability.
+
+% \paragraph{Step IX --- Complexity (\Cref{sec:setting-cs}--\Cref{sec:main}).}
+% The escape theorem holds \emph{provided} the parameters
+% $(S,T,F,\theta,\theta',\theta'',\gamma)$ satisfy a system of constraints accumulated
+% along Steps~III--VIII. Step~IX resolves this system exactly: it derives the two
+% envelope bounds on $S$, optimizes the budget splits, computes
+% $S$, $T$, $F$, and the iteration count, and closes the union bound over windows.
+% The current limitations of the result (regime restriction and its strength) are
+% discussed in \Cref{rem:vacuity}.
+
+% ============================================================
+\section{Step I --- Decrease Lemmas}\label{sec:decrease}
+
+\paragraph{Rationale.}
+Each iteration type comes with a stepsize chosen to make the guaranteed decrease
+optimal for that type. The two lemmas below are the per-step guarantees; they feed
+the improve-or-localize inequality of Step~II, and (through it) the entire
+function-value accounting of the escape proof.
+
+\begin{lemma}[Decrease on non-restarted iterations]\label{lem:decreaseN}
+For every non-restarted iteration $k \in \setN$ (so that
+$g_{k}^{\top}d_{k} \le -\sigma\norm{g_{k}}^{1+p}$,
+$\norm{d_{k}} \le \kappa\norm{g_{k}}^{q}$, and
+$\alpha_{k} = \alpha^{\ast}_{\setN} = \tfrac{\sigma}{\Lone\kappa^{2}}
+\norm{g_{k}}^{1+p-2q}$),
+\begin{equation}\label{eq:decreaseN}
+f(x_{k}) - f(x_{k+1}) \;\geq\; \cN \, \norm{g_{k}}^{\,2(1+p-q)},
+\qquad
+\cN = \frac{\sigma^{2}}{2\Lone \kappa^{2}} .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+This is the fixed-stepsize NCG decrease guarantee of \cite{RoyerChan2022}; we
+reproduce the computation for completeness. Apply the descent lemma
+(\Cref{lem:descent}) at $x = x_{k}$, $y = x_{k+1} = x_{k}+\alpha_{k}d_{k}$:
+\[
+f(x_{k+1})
+\;\le\; f(x_{k}) + \alpha_{k}\, g_{k}^{\top}d_{k}
+        + \frac{\Lone}{2}\,\alpha_{k}^{2}\norm{d_{k}}^{2}.
+\]
+By the two properties of a kept direction,
+$g_{k}^{\top}d_{k}\le-\sigma\norm{g_{k}}^{1+p}$ and
+$\norm{d_{k}}^{2}\le\kappa^{2}\norm{g_{k}}^{2q}$, so
+\[
+f(x_{k}) - f(x_{k+1})
+\;\ge\; \alpha_{k}\,\sigma\norm{g_{k}}^{1+p}
+       - \frac{\Lone}{2}\,\alpha_{k}^{2}\,\kappa^{2}\norm{g_{k}}^{2q}.
+\]
+Substituting $\alpha_{k} = \tfrac{\sigma}{\Lone\kappa^{2}}\norm{g_{k}}^{1+p-2q}$:
+the first term equals
+$\tfrac{\sigma^{2}}{\Lone\kappa^{2}}\norm{g_{k}}^{(1+p-2q)+(1+p)}
+= \tfrac{\sigma^{2}}{\Lone\kappa^{2}}\norm{g_{k}}^{2(1+p-q)}$,
+and the second term equals
+$\tfrac{\Lone}{2}\cdot\tfrac{\sigma^{2}}{\Lone^{2}\kappa^{4}}
+\norm{g_{k}}^{2(1+p-2q)}\cdot\kappa^{2}\norm{g_{k}}^{2q}
+= \tfrac{\sigma^{2}}{2\Lone\kappa^{2}}\norm{g_{k}}^{2(1+p-q)}$.
+Subtracting,
+\[
+f(x_{k}) - f(x_{k+1})
+\;\ge\; \frac{\sigma^{2}}{\Lone\kappa^{2}}
+        \Bigl(1-\tfrac12\Bigr)\norm{g_{k}}^{2(1+p-q)}
+\;=\; \frac{\sigma^{2}}{2\Lone\kappa^{2}}\,\norm{g_{k}}^{2(1+p-q)} .
+\qedhere
+\]
+\end{proof}
+
+\begin{remark}[Optimality of $\alpha^{\ast}_{\setN}$]
+The right-hand side of the intermediate bound,
+$\alpha\,\sigma\norm{g}^{1+p} - \tfrac{\Lone\kappa^{2}}{2}\alpha^{2}\norm{g}^{2q}$,
+is a downward parabola in $\alpha$, maximized exactly at
+$\alpha = \tfrac{\sigma}{\Lone\kappa^{2}}\norm{g}^{1+p-2q} = \alpha^{\ast}_{\setN}$.
+\end{remark}
+
+\begin{lemma}[Decrease on restarted iterations]\label{lem:decreaseR}
+For every restarted iteration $k \in \setR$ (so that $d_{k} = -g_{k}$ and
+$\alpha_{k} = 1/\Lone$),
+\begin{equation}\label{eq:decreaseR}
+f(x_{k}) - f(x_{k+1}) \;\geq\; \cR \, \norm{g_{k}}^{2},
+\qquad
+\cR = \frac{1}{2\Lone} .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Apply \Cref{lem:descent} with $y - x = -\tfrac{1}{\Lone}g_{k}$:
+\[
+f(x_{k+1})
+\;\le\; f(x_{k}) - \frac{1}{\Lone}\norm{g_{k}}^{2}
+        + \frac{\Lone}{2}\cdot\frac{1}{\Lone^{2}}\norm{g_{k}}^{2}
+\;=\; f(x_{k}) - \frac{1}{2\Lone}\norm{g_{k}}^{2}.
+\]
+Rearranging gives \eqref{eq:decreaseR}. As in the previous remark, $\alpha = 1/\Lone$
+maximizes $\alpha\norm{g}^{2}-\tfrac{\Lone}{2}\alpha^{2}\norm{g}^{2}$, so the
+restarted stepsize is also decrease-optimal for its regime.
+\end{proof}
+
+% ============================================================
+\section{Step II --- Improve or Localize}\label{sec:improve}
+
+\paragraph{Rationale.}
+The goal of this section is to bound the total squared displacement
+$\sum_{k} \norm{x_{k+1} - x_{k}}^{2}$ by the total function decrease, uniformly over
+restarted and non-restarted iterations. We treat the two cases separately and find the
+\emph{same} per-step bound, which we then telescope. The resulting inequality admits
+the two readings of Step~II in \Cref{sec:roadmap} (improve / localize); the localize
+reading is the one consumed by the escape proof.
+
+\subsection{Non-restarted iterations ($k \in \setN$)}\label{sub:improveN}
+For a non-restarted iteration the restart condition guarantees
+$\norm{d_{k}} \leq \kappa \norm{g_{k}}^{q}$, so
+\begin{align}
+\norm{x_{k+1} - x_{k}}^{2}
+  &= \alpha_{k}^{2} \norm{d_{k}}^{2}
+   \;\leq\; \alpha_{k}^{2}\, \kappa^{2} \norm{g_{k}}^{2q} \notag\\
+  &= \frac{\sigma^{2}}{\Lone^{2}\kappa^{4}}\,
+     \norm{g_{k}}^{\,2(1+p-2q)}\, \kappa^{2}\, \norm{g_{k}}^{2q}
+   \;=\; \left(\frac{\sigma}{\Lone\kappa}\right)^{2}
+        \norm{g_{k}}^{\,2(1+p-q)} ,
+\label{eq:disp-N}
+\end{align}
+where we used $\alpha_{k} = \tfrac{\sigma}{\Lone\kappa^{2}}\norm{g_{k}}^{1+p-2q}$ and
+combined the exponents $2(1+p-2q) + 2q = 2(1+p-q)$.
+
+From \Cref{lem:decreaseN}, $\cN \norm{g_{k}}^{2(1+p-q)} \leq f(x_{k}) - f(x_{k+1})$,
+that is,
+\begin{equation}\label{eq:grad-bound-N}
+\norm{g_{k}}^{\,2(1+p-q)}
+  \;\leq\; \frac{2\Lone\kappa^{2}}{\sigma^{2}}\,
+           \big(f(x_{k}) - f(x_{k+1})\big) .
+\end{equation}
+Substituting \eqref{eq:grad-bound-N} into \eqref{eq:disp-N} yields
+\begin{equation}\label{eq:disp-N-final}
+\norm{x_{k+1} - x_{k}}^{2}
+  \;\leq\; \frac{\sigma^{2}}{\Lone^{2}\kappa^{2}}
+           \cdot \frac{2\Lone\kappa^{2}}{\sigma^{2}}\,
+           \big(f(x_{k}) - f(x_{k+1})\big)
+  \;=\; \frac{2}{\Lone}\,\big(f(x_{k}) - f(x_{k+1})\big) .
+\end{equation}
+
+\subsection{Restarted iterations ($k \in \setR$)}\label{sub:improveR}
+For a restarted iteration $d_{k} = -g_{k}$ and $\alpha_{k} = 1/\Lone$, hence
+\begin{equation}\label{eq:disp-R}
+\norm{x_{k+1} - x_{k}}^{2}
+  = \alpha_{k}^{2}\norm{d_{k}}^{2}
+  = \alpha_{k}^{2}\norm{g_{k}}^{2}
+  = \frac{1}{\Lone^{2}}\norm{g_{k}}^{2} .
+\end{equation}
+From \Cref{lem:decreaseR}, $\norm{g_{k}}^{2} \leq \tfrac{1}{\cR}(f(x_{k}) - f(x_{k+1}))
+= 2\Lone\,(f(x_{k}) - f(x_{k+1}))$, so
+\begin{equation}\label{eq:disp-R-final}
+\norm{x_{k+1} - x_{k}}^{2}
+  \;\leq\; \frac{1}{\Lone^{2}} \cdot 2\Lone\,
+           \big(f(x_{k}) - f(x_{k+1})\big)
+  \;=\; \frac{2}{\Lone}\,\big(f(x_{k}) - f(x_{k+1})\big) .
+\end{equation}
+
+\subsection{The uniform improve-or-localize lemma}\label{sub:improve-uniform}
+
+\begin{lemma}[Improve or localize]\label{lem:improve}
+For every iteration $k$ taken with the optimal stepsize $\alpha^{\ast}$,
+\begin{equation}\label{eq:improve-step}
+\norm{x_{k+1} - x_{k}}^{2}
+  \;\leq\; \frac{2}{\Lone}\,\big(f(x_{k}) - f(x_{k+1})\big) .
+\end{equation}
+In particular each such step decreases $f$. Consequently, telescoping over any window
+of consecutive such steps $k = 0, \dots, T-1$,
+\begin{equation}\label{eq:improve-sum}
+\sum_{k=0}^{T-1} \norm{x_{k+1} - x_{k}}^{2}
+  \;\leq\; \frac{2}{\Lone}\,\big(f(x_{0}) - f(x_{T})\big)
+  \;\leq\; \frac{2}{\Lone}\,\big(f(x_{0}) - \fstar\big).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+The per-step bound \eqref{eq:improve-step} is \eqref{eq:disp-N-final} for
+$k \in \setN$ and \eqref{eq:disp-R-final} for $k \in \setR$; the two regimes give the
+same constant. The left-hand side of \eqref{eq:improve-step} is nonnegative, so each
+per-step decrease $f(x_{k})-f(x_{k+1})$ is nonnegative. Summing
+\eqref{eq:improve-step} over $k = 0,\dots,T-1$ and telescoping the right-hand side
+gives \eqref{eq:improve-sum}.
+\end{proof}
+
+\begin{remark}[Interpretation: a dichotomy]\label{rem:improve}
+\Cref{lem:improve} is a dichotomy. At any moment, either the function value has
+decreased by a meaningful amount (\emph{improve}), or the iterates did not move much
+and we are stuck near where we started (\emph{localize}). The aim of
+\Cref{sec:escape} is to upgrade this dichotomy near a strict saddle into the
+statement: \emph{at a strict saddle, we always improve}. If we can prove that, then
+strict saddles are not an obstruction, and a failure to improve at some iteration can
+only mean we are at a (local) minimizer.
+\end{remark}
+
+\begin{remark}[Flagged gap: the in-window stepsize is a third case]
+\label{rem:window-steps-gap}
+% NOTE (flagged correction/gap, do not resolve silently):
+\Cref{lem:improve} covers exactly two iteration types: non-restarted steps with
+$\alpha = \alpha^{\ast}_{\setN}$, and restarted steps with $\alpha = 1/\Lone$.
+Inside the escape window, however, \Cref{algo:PNCG} takes $\alpha_{k} = 1/\Lone$
+with \emph{NCG directions} --- a third combination, covered by neither case. For
+this combination the per-step decrease can genuinely fail: the descent lemma gives
+\[
+f(x_{k}) - f(x_{k+1})
+\;\ge\; \frac{\sigma}{\Lone}\norm{g_{k}}^{1+p}
+        - \frac{\kappa^{2}}{2\Lone}\norm{g_{k}}^{2q},
+\]
+whose sign depends on $\norm{g_{k}}$. Since \Cref{lem:localization} below applies
+\Cref{lem:improve} to in-window steps, this is a gap in the present version of the
+argument.
+
+\emph{Candidate resolution:} Set $p = q = 1$, then we can remove the constraint $\alpha_k = 1/\Lone$,
+and we still have the same results with some $\alpha_{\min} \in \{\alpha^{\ast}_{\mathcal{N}}, 1/\Lone\}$.
+\end{remark}
+
+% ============================================================
+\section{Near-Saddle Analysis and Escape}\label{sec:escape}
+
+The improve-or-localize lemma (\Cref{lem:improve}) is generic and
+curvature-blind: by itself, it does not exclude the \emph{localize} case at a
+strict saddle. To exclude it, we study the dynamics of $u_{k} := x_{k}-\snap$
+\emph{centered at the snapshot}, using the second-order Taylor expansion of $f$
+around $\snap$. The expansion is accurate in a small ball around $\snap$ ---
+precisely the localize regime.
+
+% =============================================================================
+\subsection{Step III --- Linearized dynamics around the snapshot}
+\label{sub:linearization}
+% =============================================================================
+
+\paragraph{Rationale.}
+We linearize in order to perform a spectral analysis: get a linear system, compute
+its eigenvalues, and show that the system has an eigenvalue strictly larger than
+$1$. The element of study is $u_{k} = x_{k}-\snap$, and specifically its projection
+$c_{k} = \inner{u_{k}}{\vmin}$ on the negative-curvature direction: if the
+escape eigenvalue $\mu_{+}$ exceeds $1$, then $c_{k}$ is amplified geometrically and
+the iterate is repelled from the stationary point along $\vmin$. Everything after
+this subsection exists to control the non-linear corrections to this picture.
+
+Throughout this section, we condition on a perturbation trigger at iterate
+$\snap$, i.e.\
+\[
+\norm{g_{\snap}} \le \epsg, \qquad \lmin\!\bigl(\hess f(\snap)\bigr) \le -\epsH,
+\qquad g_{\snap} := \grad f(\snap).
+\]
+We center the analysis at $\snap$. Set
+\[
+H \;:=\; \hess f(\snap),
+\]
+and let $(\lmin,\vmin)$ denote the eigenpair of $H$ at its most negative
+eigenvalue; by the trigger, $|\lmin|\ge\epsH$. Define
+\begin{equation}\label{eq:near-saddle-quants}
+u_{k} \;:=\; x_{k}-\snap,
+\qquad
+c_{k} \;:=\; \inner{u_{k}}{\vmin},
+\qquad
+\eta_{k} \;:=\; \inner{d_{k-1}}{\vmin},
+\end{equation}
+with the convention $d_{-1}:=0$ (so $\eta_{0}=0$, encoding the
+post-perturbation momentum reset $d_{0}=-g_{0}$). Inside the window the stepsize is
+constant, $\alpha = 1/\Lone$ (cf.\ \Cref{algo:PNCG}; but see
+\Cref{rem:window-steps-gap}).
+
+\paragraph{Quadratic model at $\snap$.}
+The second-order Taylor expansion of $f$ at $\snap$ is
+\begin{equation}\label{eq:quadmodel}
+\tilde f(x) \;=\; f(\snap) + g_{\snap}^{\top}(x-\snap)
+   + \tfrac{1}{2}(x-\snap)^{\top}H(x-\snap),
+\qquad
+\grad\tilde f(x) \;=\; g_{\snap} + H(x-\snap).
+\end{equation}
+The full gradient differs from the model by the error
+\begin{equation}\label{eq:tildee-def}
+\tilde e(x) \;:=\; \grad f(x) - g_{\snap} - H(x-\snap),
+\end{equation}
+bounded in \Cref{lem:graderror} by $\norm{\tilde e(x)}\le(\Ltwo/2)\norm{x-\snap}^{2}$.
+We write $\tilde e_{k} := \tilde e(x_{k})$. Unlike the expansion at a critical
+point, the constant term $g_{\snap}$ does \emph{not} vanish: the snapshot has
+small ($\le\epsg$) but nonzero gradient.
+
+\paragraph{Linearized update.}
+The NCG iteration $x_{k+1}=x_{k}+\alpha_{k} d_{k}$ with
+$d_{k}=-g_{k}+\beta_{k}d_{k-1}$ and in-window stepsizes
+$\alpha_{k}\in\{\amin,1/\Lone\}$ (\Cref{ass:pq}), combined with the
+decomposition $g_{k}=g_{\snap}+Hu_{k}+\tilde e_{k}$, gives
+\begin{align}
+d_{k} &\;=\; -H u_{k} + \beta_{k}d_{k-1} - g_{\snap} - \tilde e_{k},
+\label{eq:dk-snap}\\[2pt]
+u_{k+1} &\;=\; (I-\alpha_k H)\,u_{k} + \alpha_k\beta_{k}\,d_{k-1}
+              - \alpha_k\,g_{\snap} - \alpha_k\,\tilde e_{k}.
+\label{eq:uk-snap}
+\end{align}
+Compared with a recurrence centered at an exact critical point, the new
+feature is the constant forcing $-\alpha_k\,g_{\snap}$.
+
+\paragraph{State-space form.}
+Stacking $z_{k}:=(u_{k},\,d_{k-1})$,
+\begin{equation}\label{eq:state-space}
+z_{k+1} \;=\; M_{k}\,z_{k} \;-\; b \;-\; r_{k},
+\end{equation}
+where
+\begin{equation}\label{eq:Mblock}
+M_{k} \;=\; \begin{pmatrix}
+   I-\alpha H & \alpha\beta_{k}I \\ -H & \beta_{k}I
+\end{pmatrix},
+\qquad
+b \;=\; \begin{pmatrix} \alpha\,g_{\snap} \\ g_{\snap}\end{pmatrix},
+\qquad
+r_{k} \;=\; \begin{pmatrix} \alpha\,\tilde e_{k} \\ \tilde e_{k}\end{pmatrix}.
+\end{equation}
+The additive terms --- the constant forcing $b$ from $g_{\snap}$ and the
+model-error residual $r_{k}$ --- are exactly the corrections that the later steps
+will control.
+
+\paragraph{Diagonalization.}
+Since $H$ is symmetric, it diagonalizes in an orthonormal eigenbasis
+$\{v_{i}\}_{i=1}^{d}$ with eigenvalues $\lambda_{1}\le\cdots\le\lambda_{d}$
+(so $\lambda_{1}=\lmin$ and $v_{1}=\vmin$). Projecting~\eqref{eq:state-space}
+onto each $v_{i}$ decouples $M_{k}$ into $d$ independent $2\times2$ blocks
+\begin{equation}\label{eq:Miblock}
+M_{k,i} \;=\; \begin{pmatrix}
+   1-\alpha\lambda_{i} & \alpha\beta_{k} \\ -\lambda_{i} & \beta_{k}
+\end{pmatrix}
+\end{equation}
+acting on the scalar pair $(\inner{u_{k}}{v_{i}},\,\inner{d_{k-1}}{v_{i}})$.
+The next lemma shows that, along the negative-curvature direction,
+$M_{k,i}$ has an eigenvalue strictly larger than $1$.
+
+\begin{lemma}[Escape eigenvalue along negative curvature]\label{lem:escapeeig}
+Fix a step $k$ and an eigenpair $(\lambda_{i},v_{i})$ of $H$ with
+$\lambda_{i}<0$, and suppose $\beta_{k}\ge 0$ (as holds for Fletcher-Reeves). The matrix $M_{k,i}$
+in~\eqref{eq:Miblock} has a real eigenvalue
+\begin{equation}\label{eq:mu-plus}
+\mu_{+} \;\ge\; 1 + \alpha\,|\lambda_{i}| \;>\; 1,
+\end{equation}
+with equality $\mu_{+}=1+\alpha|\lambda_{i}|$ iff $\beta_{k}=0$
+(the gradient-descent case).
+\end{lemma}
+
+\begin{proof}
+The block $M_{k,i}$ has $\operatorname{trace}M_{k,i} = (1-\alpha\lambda_{i})+\beta_{k}$
+and
+\[
+\det M_{k,i}
+   \;=\; (1-\alpha\lambda_{i})\,\beta_{k} - (\alpha\beta_{k})(-\lambda_{i})
+   \;=\; \beta_{k}.
+\]
+Its characteristic polynomial is therefore
+$p(\mu) = \mu^{2} - (1-\alpha\lambda_{i}+\beta_{k})\mu + \beta_{k}$,
+an upward parabola. Evaluating at $\mu=1$,
+\[
+p(1) \;=\; 1 - (1-\alpha\lambda_{i}+\beta_{k}) + \beta_{k}
+     \;=\; \alpha\,\lambda_{i} \;<\; 0,
+\]
+since $\alpha>0$ and $\lambda_{i}<0$. An upward parabola negative at $\mu=1$
+has two distinct real roots straddling $1$, so the larger root exceeds $1$.
+For the sharper bound, set $w:=\alpha|\lambda_{i}|=-\alpha\lambda_{i}>0$, so
+that $p(\mu)=\mu^{2}-(1+w+\beta_{k})\mu+\beta_{k}$ and
+\[
+p(1+w) \;=\; (1+w)^{2}-(1+w+\beta_{k})(1+w)+\beta_{k}
+        \;=\; -w\,\beta_{k} \;\le\; 0.
+\]
+Hence $1+w$ lies between the two roots (or equals the larger one when
+$\beta_{k}=0$), so the larger root satisfies
+$\mu_{+}\ge 1+w$, with equality iff $\beta_{k}=0$. Explicitly,
+$\mu_{\pm}=\tfrac{1}{2}\bigl[(1+w+\beta_{k}) \pm
+\sqrt{(1+w+\beta_{k})^{2}-4\beta_{k}}\,\bigr]$.
+\end{proof}
+
+\paragraph{Projected recurrence on $c_{k}$.}
+Projecting~\eqref{eq:uk-snap} on $\vmin$ and using $H\vmin=\lmin\vmin$,
+\begin{equation}\label{eq:c-recurrence}
+c_{k+1}
+\;=\; (1-\alpha_{k}\lmin)\,c_{k} + \alpha_{k}\,\beta_{k}\,\eta_{k}
+      - \alpha_{k}\,\inner{g_{\snap}}{\vmin}
+      - \alpha_{k}\,\inner{\tilde e_{k}}{\vmin}.
+\end{equation}
+Since $-\lmin\ge\epsH$, we have $1-\alpha_{k}\lmin\ge1+\alpha_{k}\epsH$. The
+reverse triangle inequality applied to~\eqref{eq:c-recurrence} yields
+\begin{equation}\label{eq:c-lower}
+|c_{k+1}|
+\;\ge\; (1+\alpha_{k}\epsH)\,|c_{k}|
+\;-\; \alpha_{k}\,\beta_{k}\,|\eta_{k}|
+\;-\; \alpha_{k}\,\epsg
+\;-\; \alpha_{k}\,\norm{\tilde e_{k}}.
+\end{equation}
+where we used $|\inner{g_{\snap}}{\vmin}|\le\norm{g_{\snap}}\le\epsg$ and
+$|\inner{\tilde e_{k}}{\vmin}|\le\norm{\tilde e_{k}}$.
+The recurrence~\eqref{eq:c-lower} contains three perturbing terms: the
+\emph{momentum residual} $\alpha\beta_{k}|\eta_{k}|$, the \emph{snapshot
+forcing} $\alpha\epsg$, and the \emph{model error} $\alpha\norm{\tilde e_{k}}$.
+Each will be controlled separately in the inductive analysis
+(\Cref{ssec:induction}).
+
+\begin{remark}[Interpretation, and what remains to be done]\label{rem:escape}
+The escape eigenvalue $\mu_{+}>1$ from \Cref{lem:escapeeig} drives geometric
+growth of $c_{k}$ under the pure linearization (i.e., $\tilde e\equiv 0$ and
+$g_{\snap}=0$): the iterate is repelled from the snapshot along the
+negative-curvature direction $\vmin$. In the actual NCG iteration, three
+corrections must be handled:
+\begin{itemize}[leftmargin=*]
+   \item the \emph{model error} $\tilde e_{k}$, controlled by
+     \Cref{lem:graderror} (Step~IV);
+   \item the \emph{snapshot forcing} $g_{\snap}$, small by the trigger
+     condition $\norm{g_{\snap}}\le\epsg$;
+   \item the \emph{absence of an initial signal}: the geometric growth
+     $|c_{k}|\gtrsim\mu_{+}^{k}|c_{0}|$ is vacuous if $|c_{0}|$ is zero (or
+     tiny). The random perturbation $\xi$ guarantees a nontrivial initial
+     $|c_{0}| = |\inner{\xi}{\vmin}|$ via the anti-concentration estimate of
+     \Cref{lem:anticoncentration} (Step~V).
+\end{itemize}
+The momentum residual additionally requires an \emph{upper bound on
+$\beta_{k}$}, which for Fletcher--Reeves requires a gradient \emph{lower}
+bound (Step~VI). The remainder of \Cref{sec:escape} formalizes each of these
+corrections, and Step~VII assembles them into the induction.
+\end{remark}
+
+% =============================================================================
+\subsection{Step IV --- Quadratic model error}\label{sub:graderror-section}
+% =============================================================================
+
+\paragraph{Rationale.}
+Straightforward step: bound $\norm{\tilde e_{k}}$ above. This is the error between
+the real gradient and the quadratically approximated one; if it could exceed the
+geometric push $\alpha\epsH|c_{k}|$, the escape signal could be cancelled. The
+bound is quadratic in the distance to the snapshot, which is why the analysis
+must keep the iterates confined (invariant~(i) of Step~VII).
+
+\begin{lemma}[Quadratic model error at the snapshot]\label{lem:graderror}
+Under \Cref{ass:hesslip}, for every $x\in\R^{d}$,
+\begin{equation}\label{eq:graderror-snap}
+\grad f(x) \;=\; g_{\snap} + H(x-\snap) + \tilde e(x),
+\qquad
+\norm{\tilde e(x)} \;\le\; \frac{\Ltwo}{2}\,\norm{x-\snap}^{2}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Let $x_{t}:=\snap+t(x-\snap)$ for $t\in[0,1]$, so $\frac{dx_{t}}{dt}=x-\snap$.
+Set $\phi(t):=\grad f(x_{t})$; by the chain rule,
+$\phi'(t)=\hess f(x_{t})(x-\snap)$. By the fundamental theorem of calculus,
+\[
+\grad f(x)-g_{\snap}
+\;=\; \grad f(x)-\grad f(\snap)
+\;=\; \int_{0}^{1}\phi'(t)\,dt
+\;=\; \int_{0}^{1}\hess f(x_{t})(x-\snap)\,dt.
+\]
+Subtracting $\int_{0}^{1}H(x-\snap)\,dt = H(x-\snap)$,
+\[
+\tilde e(x)
+\;=\; \int_{0}^{1}\bigl(\hess f(x_{t})-H\bigr)(x-\snap)\,dt.
+\]
+Taking norms and using \Cref{ass:hesslip} together with $x_{t}-\snap=t(x-\snap)$,
+\[
+\norm{\tilde e(x)}
+\;\le\; \int_{0}^{1}\norm{\hess f(x_{t})-\hess f(\snap)}\,\norm{x-\snap}\,dt
+\;\le\; \int_{0}^{1}\Ltwo\,t\,\norm{x-\snap}^{2}\,dt
+\;=\; \frac{\Ltwo}{2}\,\norm{x-\snap}^{2}.
+\qedhere
+\]
+\end{proof}
+
+% =============================================================================
+\subsection{Setting for the probabilistic escape}\label{sub:setting}
+% =============================================================================
+
+The post-perturbation iterate is
+\[
+x_{0} \;:=\; \snap + \xi,
+\qquad
+\xi \sim \mathcal{U}\!\bigl(\mathcal{B}^{d}(0,\Rstar)\bigr),
+\]
+so that $u_{0}=\xi$ and $\norm{u_{0}}\le \Rstar$ deterministically. The escape window runs PR-NCG for $T=\Tp$ steps with the algorithm's ordinary
+stepsize rule, so that $\alpha_{k}\in\{\amin,\,1/\Lone\}$ at every window step
+(\Cref{ass:pq}); in particular $\alpha_{k}\ge\amin$ and
+$\alpha_{k}\Lone\le 1$ throughout.
+
+The three distinguished constants of the analysis are the dimensional factor, the
+\emph{optimal perturbation radius}, and the \emph{anti-concentration threshold}:
+\begin{equation}\label{eq:Rstar-snap}
+a \;:=\; \sqrt{\frac{\pi}{2(d+2)}},
+\qquad
+\Rstar \;:=\; \frac{a\,\epsH\,\delta}{\Ltwo},
+\qquad
+\sdel \;:=\; a\,\delta\,\Rstar
+\;=\; \frac{a^{2}\,\epsH\,\delta^{2}}{\Ltwo}
+\;=\; \frac{\pi\,\epsH\,\delta^{2}}{2\,\Ltwo\,(d+2)}.
+\end{equation}
+The choice $R = \Rstar$ is justified by the optimization carried out in the
+proof of \Cref{lem:gfloor0} (Step~VI). Direct computation from
+\eqref{eq:Rstar-snap} gives the exact identities
+\begin{equation}\label{eq:identities}
+\frac{\Rstar}{\sdel} \;=\; \frac{1}{a\,\delta},
+\qquad
+\Ltwo\,(\Rstar)^{2} \;=\; \epsH\,\sdel ,
+\end{equation}
+which will be used repeatedly in Step~IX (the second identity is the
+\emph{structural identity} of \Cref{lem:structural}).
+
+% =============================================================================
+\subsection{Step V --- Anti-concentration of the perturbation}\label{sub:anticonc}
+% =============================================================================
+
+\paragraph{Rationale.}
+Straightforward step: show that the perturbation has a non-negligible component
+along the negative-curvature direction, with high probability. This is the only
+probabilistic ingredient in the escape analysis; everything downstream is
+deterministic conditional on the good event $\mathcal{G}_{0}$.
+
+\begin{lemma}[Anti-concentration]\label{lem:anticoncentration}
+Let $\xi\sim\mathcal{U}(\mathcal{B}^{d}(0,R))$ and let $v\in\R^{d}$ be a unit
+vector. For every $s\in(0,R]$,
+\begin{equation}\label{eq:anticonc-prob}
+\Pr\bigl(|\inner{\xi}{v}|\le s\bigr)
+\;\le\; \frac{s}{R}\,\sqrt{\frac{2(d+2)}{\pi}}.
+\end{equation}
+In particular, with $R=\Rstar$ as in~\eqref{eq:Rstar-snap} and $s=\sdel$, the event
+\[
+\mathcal{G}_{0} \;:=\; \bigl\{|\inner{\xi}{\vmin}|\ge\sdel\bigr\}
+\qquad\text{satisfies}\qquad
+\Pr(\mathcal{G}_{0}) \;\ge\; 1-\delta.
+\]
+\end{lemma}
+
+\begin{proof}
+\emph{Step 1: rotational invariance reduction.}
+The Lebesgue measure on $\mathcal{B}^{d}(0,R)$ is invariant under any
+orthogonal $Q\in O(d)$, hence $Q\xi\stackrel{d}{=}\xi$. Choose $Q$ with
+$Qe_{1}=v$ (complete $v$ to an orthonormal basis). Then
+\[
+\inner{\xi}{v} \;=\; \inner{\xi}{Qe_{1}} \;=\; \inner{Q^{\top}\xi}{e_{1}},
+\qquad Q^{\top}\xi\stackrel{d}{=}\xi,
+\]
+so the distribution of $\inner{\xi}{v}$ depends only on $\norm{v}=1$, not on
+the direction of $v$. Take $v=e_{1}$ and set $X:=\xi_{1}$.
+
+\emph{Step 2: marginal density of $X$.}
+Write $\xi=(\xi_{1},\xi_{\perp})$ with $\xi_{\perp}\in\R^{d-1}$. By Fubini's
+theorem on the uniform density,
+\[
+f_{X}(x)
+\;=\; \int_{\R^{d-1}}\frac{\indic{x^{2}+\norm{\xi_{\perp}}^{2}\le R^{2}}}{V_{d}R^{d}}\,d\xi_{\perp},
+\]
+with $V_{k}:=\pi^{k/2}/\Gamma(k/2+1)$ the unit-ball volume in $\R^{k}$. For
+$|x|\le R$, the slice is the $(d-1)$-ball of radius $\sqrt{R^{2}-x^{2}}$, of
+measure $V_{d-1}(R^{2}-x^{2})^{(d-1)/2}$, so
+\begin{equation}\label{eq:marginal-density}
+f_{X}(x) \;=\; \frac{V_{d-1}}{V_{d}R^{d}}\,(R^{2}-x^{2})^{(d-1)/2}\,\indic{|x|\le R}.
+\end{equation}
+
+\emph{Step 3: density peaks at $0$.}
+For $|x|\le R$, $(R^{2}-x^{2})^{(d-1)/2}$ is decreasing in $|x|$, hence
+\[
+f_{X}(x)\;\le\; f_{X}(0) \;=\; \frac{V_{d-1}}{V_{d}\,R}.
+\]
+
+\emph{Step 4: volume ratio via Gautschi's inequality.}
+By definition,
+\[
+\frac{V_{d-1}}{V_{d}}
+\;=\; \frac{1}{\sqrt{\pi}}\cdot\frac{\Gamma(d/2+1)}{\Gamma((d+1)/2)}.
+\]
+Recall Gautschi's inequality: for $x>0$ and $0<s<1$,
+$\Gamma(x+1)/\Gamma(x+s)\le(x+1)^{1-s}$. With $x=d/2$, $s=1/2$,
+\[
+\frac{\Gamma(d/2+1)}{\Gamma((d+1)/2)} \;\le\; \sqrt{(d+2)/2},
+\qquad\text{so}\qquad
+\frac{V_{d-1}}{V_{d}} \;\le\; \sqrt{\frac{d+2}{2\pi}}.
+\]
+
+\emph{Step 5: integrate.}
+Combining Steps 3 and 4, $f_{X}(0)\le \frac{1}{R}\sqrt{(d+2)/(2\pi)}$, so
+\[
+\Pr(|X|\le s) \;=\; \int_{-s}^{s}f_{X}(x)\,dx
+\;\le\; 2s\,f_{X}(0)
+\;\le\; \frac{s}{R}\,\sqrt{\frac{2(d+2)}{\pi}},
+\]
+which is~\eqref{eq:anticonc-prob}.
+
+\emph{Step 6: high-probability event.}
+With $R=\Rstar$ and $s=\sdel=a\delta \Rstar$, recalling
+$a = \sqrt{\pi/(2(d+2))}$,
+\[
+\Pr\bigl(|\inner{\xi}{\vmin}|\le\sdel\bigr)
+\;\le\; \frac{\sdel}{\Rstar}\sqrt{\frac{2(d+2)}{\pi}}
+\;=\; a\,\delta\cdot\frac{1}{a}
+\;=\; \delta,
+\]
+so $\Pr(\mathcal{G}_{0})=1-\Pr(|\inner{\xi}{\vmin}|\le\sdel)\ge 1-\delta$.
+\end{proof}
+
+\begin{remark}[Reading \Cref{lem:anticoncentration}]
+This lemma is the only probabilistic ingredient in the escape analysis.
+It guarantees that, with probability at least $1-\delta$, the random
+perturbation has a non-negligible component along the negative-curvature
+direction: $|\inner{\xi}{\vmin}|\ge\sdel$. A~priori the uniform
+perturbation could land almost orthogonally to $\vmin$, giving
+$\inner{\xi}{\vmin}\approx 0$ and no usable escape signal, in which case
+the geometric growth from \Cref{lem:escapeeig} would have nothing to
+amplify. \Cref{lem:anticoncentration} excludes this bad case with high
+probability; everything that follows is deterministic conditional on the
+event $\mathcal{G}_{0}$.
+\end{remark}
+
+% =============================================================================
+\subsection{Step VI --- Post-perturbation gradient lower bound}\label{sub:gfloor}
+% =============================================================================
+
+\paragraph{Rationale (Fletcher--Reeves specific).}
+This step exists to control the momentum term. Since
+$\beta^{\mathrm{FR}}_{k} = \norm{g_{k}}^{2}/\norm{g_{k-1}}^{2}$, bounding
+$\beta^{\mathrm{FR}}$ requires bounding $\norm{g_{k}}$ \emph{above} and
+$\norm{g_{k-1}}$ \emph{below}:
+$\beta^{\mathrm{FR}} \le \gup^{2}/\glow^{2}$. The upper bound is easy
+(Lipschitz, cf.~\eqref{eq:barg-def}); the lower bound is the hard part, because
+Lipschitz continuity only ever produces upper bounds, and the window sits in a
+region where the gradient can in principle vanish. Any other $\beta$ formula
+would mean redoing this step; heavy ball or Nesterov do not need it, because
+their momentum coefficient is constant. This subsection establishes the lower
+bound at time $0$ (and, as a by-product, fixes the optimal perturbation radius
+$\Rstar$); propagating the lower bound across the whole window is the job of the
+induction (Step~VII).
+
+\begin{lemma}[Post-perturbation gradient lower bound]\label{lem:gfloor0}
+Suppose
+\begin{equation}\label{eq:smallness-snap}
+\epsg \;<\; \tfrac{1}{2}\,\epsH\,\sdel.
+\end{equation}
+Then on the event $\mathcal{G}_{0}$ of \Cref{lem:anticoncentration},
+\[
+\norm{g_{0}} \;\ge\; \glow_{0},
+\qquad
+\glow_{0} \;:=\; \tfrac{1}{2}\,\epsH\,\sdel - \epsg \;>\; 0.
+\]
+\end{lemma}
+
+\begin{proof}
+\emph{Step 1: quadratic-model decomposition.}
+By \Cref{lem:graderror} applied at $x_{0}=\snap+\xi$ and $u_{0}=\xi$,
+\[
+g_{0} \;=\; g_{\snap} + H\,\xi + \tilde e_{0},
+\qquad
+\norm{\tilde e_{0}} \;\le\; \tfrac{\Ltwo}{2}\,\norm{\xi}^{2}
+\;\le\; \tfrac{\Ltwo}{2}\,R^{2},
+\]
+where $R$ is the perturbation radius (to be optimized in Step~5 below).
+
+\emph{Step 2: project on $\vmin$.}
+Using $H\vmin=\lmin\vmin$,
+\begin{equation}\label{eq:g0proj}
+\inner{g_{0}}{\vmin}
+\;=\; \underbrace{\inner{g_{\snap}}{\vmin}}_{=:C}
+\;+\; \underbrace{\lmin\,\inner{\xi}{\vmin}}_{=:P}
+\;+\; \underbrace{\inner{\tilde e_{0}}{\vmin}}_{=:E}.
+\end{equation}
+
+\emph{Step 3: bound the three terms.}
+On $\mathcal{G}_{0}$, $|\inner{\xi}{\vmin}|\ge\sdel$; combined with
+$|\lmin|\ge\epsH$,
+\[
+|P| \;\ge\; \epsH\,\sdel,
+\qquad
+|C| \;\le\; \norm{g_{\snap}} \;\le\; \epsg,
+\qquad
+|E| \;\le\; \norm{\tilde e_{0}} \;\le\; \tfrac{\Ltwo}{2}\,R^{2}.
+\]
+
+\emph{Step 4: combine via reverse triangle inequality.}
+From $\inner{g_{0}}{\vmin}=C+P+E$ and $|a+b+c|\ge|a|-|b|-|c|$,
+\begin{equation}\label{eq:g0-raw}
+\norm{g_{0}}
+\;\ge\; |\inner{g_{0}}{\vmin}|
+\;\ge\; |P|-|C|-|E|
+\;\ge\; \epsH\,\sdel - \epsg - \tfrac{\Ltwo}{2}\,R^{2}.
+\end{equation}
+Note $\sdel=a\delta R$ depends on $R$; substituting,
+\begin{equation}\label{eq:g0-h}
+\norm{g_{0}} \;\ge\; h(R)-\epsg,
+\qquad
+h(R) \;:=\; a\,\epsH\,\delta\,R - \frac{\Ltwo}{2}\,R^{2}.
+\end{equation}
+The map $R\mapsto h(R)$ is a downward parabola.
+
+\emph{Step 5: optimize in $R$.}
+Setting $h'(R)=0$,
+\[
+h'(R) \;=\; a\,\epsH\,\delta - \Ltwo\,R
+\quad\Longrightarrow\quad
+\Rstar \;=\; \frac{a\,\epsH\,\delta}{\Ltwo},
+\]
+matching~\eqref{eq:Rstar-snap}. Compute $h(\Rstar)$ in two pieces:
+\[
+(\Rstar)^{2}
+\;=\; \frac{a^{2}\,\epsH^{2}\,\delta^{2}}{\Ltwo^{2}},
+\qquad
+\frac{\Ltwo}{2}(\Rstar)^{2}
+\;=\; \frac{a^{2}\,\epsH^{2}\,\delta^{2}}{2\,\Ltwo}
+\;=\;\tfrac12\,\epsH\,\sdel,
+\qquad
+a\,\epsH\,\delta\,\Rstar
+\;=\; \frac{a^{2}\,\epsH^{2}\,\delta^{2}}{\Ltwo}
+\;=\;\epsH\,\sdel,
+\]
+where we used $\sdel = a^{2}\epsH\delta^{2}/\Ltwo$
+from~\eqref{eq:Rstar-snap}. (Note in passing that the middle computation is the
+structural identity $\Ltwo(\Rstar)^{2}=\epsH\sdel$
+of~\eqref{eq:identities}.) Summing,
+\[
+h(\Rstar)
+\;=\; \epsH\,\sdel-\tfrac12\,\epsH\,\sdel
+\;=\; \tfrac{1}{2}\,\epsH\,\sdel .
+\]
+
+\emph{Step 6: conclude.}
+Setting $R=\Rstar$ in~\eqref{eq:g0-h},
+\[
+\norm{g_{0}} \;\ge\; \tfrac{1}{2}\,\epsH\,\sdel - \epsg \;=\; \glow_{0},
+\]
+strictly positive under the smallness condition~\eqref{eq:smallness-snap}.
+\end{proof}
+
+\begin{remark}[Why this lemma matters]
+If $\norm{g_{0}}$ could vanish, the algorithm could trigger another perturbation
+immediately and the whole escape window would be wasted; more importantly, the FR
+coefficient $\beta_{1}$ would be uncontrolled. \Cref{lem:gfloor0} rules this out at
+time $0$. The window-wide floor $\glow$ of \eqref{eq:glow-def}, established
+inductively in \Cref{lem:induction}, is the time-$k$ analogue; note that
+$\glow \le \glow_{0}$, since the window floor pays the model error at the larger
+radius $S+\Rstar$ rather than $\Rstar$ (compare \eqref{eq:glow-def} with
+$\glow_{0} = \epsH\sdel - \epsg - \tfrac{\Ltwo}{2}(\Rstar)^{2}$, using the
+structural identity).
+\end{remark}
+
+% =============================================================================
+\subsection{Step VII --- Setting up the escape window}\label{ssec:setting}
+% =============================================================================
+
+\paragraph{Rationale.}
+The single perturbation has placed the iterate at $x_0 = \snap + \xi$, and
+the algorithm now runs for $T$ steps. Our goal is to prove that, with
+high probability, the function value drops by at least $F$ at some point
+within this window. Following the improve-or-localize dichotomy
+(\Cref{rem:improve}), there are two cases:
+\begin{enumerate}[label=(\alph*)]
+\item the function value drops by at least $F$ somewhere in $\{0,\dots,T\}$ ---
+this is what we try to prove;
+\item the function value never drops by that much, in which case
+\Cref{lem:improve} tells us the iterates stay close to $x_{0}$
+($\norm{x_{k}-x_{0}}\le S$, $S=\sqrt{2FT/\Lone}$).
+\end{enumerate}
+We work in case~(b) and derive a contradiction, so we must be in case~(a). Case~(b)
+is the bad case, and we formalize it by the localization event below.
+
+\paragraph{The localization event.}
+Let $T\in\N$ and $F>0$ be parameters (their values will be fixed in
+\Cref{thm:escape-single} and Step~IX). Define the
+\emph{localization event}
+\begin{equation}\label{eq:LT}
+\mathcal{L}_T \;:=\; \Bigl\{\max_{0\le k\le T}\bigl(f(x_0)-f(x_k)\bigr) \;<\; F\Bigr\}.
+\end{equation}
+The event $\mathcal{L}_T$ is the bad case: the function value has not dropped
+by $F$ anywhere in the window. Its complement is exactly the conclusion we
+want. So the strategy is to show that $\mathcal{G}_{0}\cap\mathcal{L}_{T}$ is
+empty: throughout this section and the next, we work conditional on
+$\mathcal{G}_0 \cap \mathcal{L}_T$ and derive a contradiction; combined with
+$\Pr(\mathcal{G}_0) \ge 1-\delta$ this gives the result.
+
+\paragraph{Confinement on $\mathcal{L}_T$.}
+On $\mathcal{L}_T$ the improve-or-localize lemma (\Cref{lem:improve}) forces
+the iterates to stay near $x_0$. Recentering at the snapshot yields the
+confinement we need.
+
+\begin{lemma}[Localized confinement around $\snap$]\label{lem:localization}
+Set the localization radius
+\begin{equation}\label{eq:S-def}
+S \;:=\; \sqrt{\frac{2FT}{\Lone}}.
+\end{equation}
+On the event $\mathcal{L}_T$, the displacement from the snapshot satisfies
+\begin{equation}\label{eq:confine}
+\norm{u_k} \;=\; \norm{x_k-\snap} \;\le\; S + \Rstar
+\qquad\text{for every }k\in\{0,1,\dots,T\}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Fix $k\in\{0,\dots,T\}$; the case $k=0$ is immediate from
+$\norm{u_{0}}=\norm{\xi}\le R^{*}$. Writing the displacement as a telescoping
+sum, then applying the triangle inequality and Cauchy--Schwarz on the sum of
+$k$ terms,
+\[
+\norm{x_{k}-x_{0}}^{2}
+\;=\;\Bigl\|\sum_{j=0}^{k-1}(x_{j+1}-x_{j})\Bigr\|^{2}
+\;\le\;\Bigl(\sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}\Bigr)^{2}
+\;\le\; k\,\sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}^{2}.
+\]
+Every window step is either restarted or a non-restarted step with
+$\alpha^{\ast}_{\setN}$ (\Cref{ass:pq}, \Cref{rem:safeguard-changelog}), so
+the per-step bound \eqref{eq:improve-step} of \Cref{lem:improve} applies at
+every $j$; its right-hand sides are nonnegative and telescope:
+\[
+\sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}^{2}
+\;\le\;\frac{2}{\Lone}\bigl(f(x_{0})-f(x_{k})\bigr)
+\;<\;\frac{2F}{\Lone}
+\qquad\text{on }\mathcal{L}_{T}.
+\]
+Combining, and using $k\le T$,
+$\norm{x_{k}-x_{0}}^{2} < 2kF/\Lone \le 2TF/\Lone = S^{2}$. The triangle
+inequality with $\norm{x_{0}-\snap}=\norm{\xi}\le R^{*}$ gives
+$\norm{u_{k}}\le\norm{x_{k}-x_{0}}+\norm{x_{0}-\snap}\le S+R^{*}$.
+\end{proof}
+
+The two contributions to $S+\Rstar$ are independent: $S$ tracks how far the
+iterate may wander inside the localization ball, while $\Rstar$ accounts for
+the initial perturbation displacement. This is why the analysis is posed
+with respect to $S+\Rstar$ rather than $S$ alone.
+(Caveat: the application of \Cref{lem:improve} to in-window steps is subject to
+the gap flagged in \Cref{rem:window-steps-gap}.)
+
+\paragraph{Validity of the quadratic model.}
+At distance $\rho$ from $\snap$, the negative-curvature signal of $\hess
+f(\snap)$ contributes roughly $\epsH\,\rho$ to the gradient in direction
+$\vmin$, while the quadratic-model error of \Cref{lem:graderror} grows as
+$\tfrac{\Ltwo}{2}\rho^2$. For the signal to dominate the error throughout
+the confinement ball, we need $\epsH\rho \ge \tfrac{\Ltwo}{2}\rho^2$ at the
+worst point $\rho = S+\Rstar$. This is the validity condition
+\begin{equation}\label{eq:S-validity}
+S + \Rstar \;\le\; \frac{2\epsH}{\Ltwo}.
+\tag{C-valid}
+\end{equation}
+Beyond this threshold, the Lipschitz-Hessian variation swamps the curvature
+signal and the linear model is no longer reliable. It will turn out
+(\Cref{rem:cvalid}) that \eqref{eq:S-validity} is \emph{implied} by the
+constraint (C-err) of \Cref{lem:induction}, so it does not need to be carried
+separately in the constants ledger of Step~IX.
+
+\paragraph{Uniform gradient upper bound.}
+The momentum analysis requires bounding the FR coefficient $\beta_k =
+\norm{g_k}^2/\norm{g_{k-1}}^2$, which in turn requires both an upper and a
+lower bound on gradient norms across the window. The upper bound is
+immediate from gradient-Lipschitz: applying \Cref{ass:gradlip} to the pair
+$(x_k, \snap)$ and combining with the trigger bound $\norm{\grad
+f(\snap)}\le\epsg$ and the confinement \eqref{eq:confine},
+\begin{equation}\label{eq:barg-def}
+\norm{g_k}
+\;\le\; \norm{g_{\snap}} + \Lone\norm{x_{k}-\snap}
+\;\le\; \epsg + \Lone\,(S+\Rstar) \;=:\; \gup
+\qquad\text{for every }k\in\{0,\dots,T\}\text{ on }\mathcal{L}_T.
+\end{equation}
+The first term $\epsg$ accounts for the residual gradient at the snapshot;
+the second term $\Lone(S+\Rstar)$ accounts for the additional gradient that
+develops as the iterate moves through the confinement ball. In the relevant
+regime $\epsg \ll \Lone(S+\Rstar)$, the second term dominates.
+
+The complementary lower bound cannot come from Lipschitz alone --- Lipschitz
+gives only upper bounds. In fact \emph{no} bound over the confinement ball can
+supply it: the ball is centered at a near-critical point, so
+$\inf_{x\in\mathcal{B}(\snap,\,S+\Rstar)}\norm{\grad f(x)}$ is essentially zero.
+The lower bound is a property of \emph{where the iterates actually go}, not of
+the region they are in; it requires that $|c_k|$ stays large and that the model
+error stays small, both of which are properties we establish in the induction.
+We therefore defer the lower bound to that section, where it appears as the
+gradient-floor invariant.
+
+\paragraph{Gradient-floor placeholder.}
+Anticipating the induction, define the gradient floor
+\begin{equation}\label{eq:glow-def}
+\glow \;:=\; \epsH\sdel - \epsg - \tfrac{\Ltwo}{2}(S+\Rstar)^{2}.
+\end{equation}
+We will show in \Cref{lem:induction} that $\glow > 0$ under the budget-split
+constraints, and that $\norm{g_k} \ge \glow$ for every $k$ in the window on
+$\mathcal{G}_0 \cap \mathcal{L}_T$. Until then, $\glow$ is a notational
+placeholder for the quantity we will eventually establish as a uniform lower
+bound. Together, $\gup$ and $\glow$ yield the FR envelope
+\begin{equation}\label{eq:bbeta-def}
+\beta_{k} \;=\; \frac{\norm{g_{k}}^{2}}{\norm{g_{k-1}}^{2}}
+\;\le\; \frac{\gup^{2}}{\glow^{2}} \;=:\; \bbeta ,
+\end{equation}
+used in the momentum constraint (C-mom) below.
+
+\paragraph{Budget splits for the geometric driver.}
+The recurrence~\eqref{eq:c-lower} for $c_k$ has the shape
+$|c_{k+1}| \ge (1+\alpha\epsH)|c_k| - (\text{three perturbing terms})$, with
+contributions from the snapshot forcing $g_{\snap}$, the quadratic-model
+error $\tilde e_k$, and the momentum term $\beta_k\eta_k$. To extract
+geometric growth, we will require each of these to be a controlled fraction
+of the driving term $\alpha\epsH|c_k|$. Introduce three positive splits
+$\theta,\theta',\theta'' \in (0,1)$ with $\theta+\theta'+\theta''<1$, and
+define the residual growth rate
+\begin{equation}\label{eq:gamma-def}
+\gamma \;:=\; 1 - \theta - \theta' - \theta''.
+\end{equation}
+The values of the splits are \emph{not} fixed here: they are decision
+variables of the analysis. Their optimal values are derived exactly in the
+complexity section (\Cref{def:canonical}); until then every statement holds
+for any admissible choice.
+% NOTE (flagged correction): an earlier version fixed the "canonical" splits to
+% theta = theta' = theta'' = 1/6 at this point. That choice is superseded by the
+% exact optimization of Step IX (Definition \ref{def:canonical}); fixing values
+% here would contradict it.
+
+\paragraph{Summary of the setup.}
+We have committed to: a localization event $\mathcal{L}_T$ on which we work;
+a localization radius $S$ and a confinement bound $S+\Rstar$ around $\snap$;
+a quadratic-model validity constraint \eqref{eq:S-validity} (later absorbed
+into (C-err)); an upper bound $\gup$ on gradient norms; budget splits
+$\theta,\theta',\theta''$; and a placeholder gradient floor $\glow$. The
+next subsection states the joint invariants and proves them by induction.
+
+% =============================================================================
+\subsection{Step VII --- Joint invariants on the escape window}
+\label{ssec:induction}
+% =============================================================================
+
+\paragraph{Rationale: why an induction is unavoidable.}
+The recurrence \eqref{eq:c-lower},
+\[
+|c_{k+1}| \;\ge\; (1+\alpha\epsH)\,|c_k| \;-\; \alpha\epsg
+\;-\;\alpha\beta_{k}|\eta_{k}|\;-\;\alpha\norm{\tilde e_{k}},
+\]
+cannot be iterated directly, because the obstacle terms depend on the past:
+\begin{itemize}[leftmargin=*]
+\item $\norm{\tilde e_{k}} \le \tfrac{\Ltwo}{2}\norm{u_{k}}^{2}$ depends on
+$u_{k} = x_{k}-\snap$;
+\item $\beta_{k}$ depends on $\norm{g_{k-1}}$, which depends on
+$\norm{u_{k-1}}$ and on $|c_{k-1}|$;
+\item $|\eta_{k}| = |\inner{d_{k-1}}{\vmin}|$ depends on the previous
+directions.
+\end{itemize}
+The solution is an induction, which lets us maintain a set of properties
+simultaneously up to time $k$, and prove them at time $k+1$. From the
+recurrence, the three things we need are:
+\begin{enumerate}
+\item how far the iterate is: $\norm{x_{k}-\snap}\le S+\Rstar$;
+\item how big the gradient is: $\norm{g_{k}}\ge\glow$;
+\item how big $|c_{k}|$ is: $|c_{k}|\ge(1+\gamma\alpha\epsH)^{k}|c_{0}|$.
+\end{enumerate}
+It is worth pausing on why no shortcut exists for item~2. The upper envelope
+$\gup$ is a supremum over the confinement ball --- a static quantity, valid for
+any point of the ball. The lower bound has no static analogue: the infimum of
+$\norm{\grad f}$ over a ball centered at a near-critical point is essentially
+zero. The floor holds only along the trajectory, and only \emph{because} the
+trajectory carries a large escape component:
+$\norm{g_{k}}\ge\epsH|c_{k}|-\epsg-\norm{\tilde e_{k}}$. This creates the
+circular dependency
+\[
+\text{floor at } j<k
+\;\Longrightarrow\; \beta_{j}\text{ controlled}
+\;\Longrightarrow\; \text{growth of } |c_{j}| \text{ up to } k
+\;\Longrightarrow\; \text{floor at } k,
+\]
+which is broken precisely by carrying all three properties together in the
+inductive hypothesis: each property at step $k+1$ is purchased with a
+\emph{different} property at step $k$. Without~(1) the model error blows up;
+without~(2) the FR coefficient $\beta_{k}$ blows up; without~(3) there is no
+floor and no escape. They prop each other up.
+
+The three constraints (C-snap), (C-err), (C-mom) below each have the form
+``\emph{this perturbing source is bounded by
+$\theta_{\bullet}\cdot\epsH\sdel$}''. Combined with the inductive lower
+bound $|c_{k}|\ge\sdel$, each constraint absorbs the corresponding
+perturbing term into a $\theta_{\bullet}$-fraction of the budget
+$\alpha\epsH|c_{k}|$, leaving the residual fraction
+$\gamma = 1-\theta-\theta'-\theta''$ as the geometric growth rate.
+
+\begin{lemma}[Window invariants for the escape]\label{lem:induction}
+Let $p=q=1$ (\Cref{ass:pq}) and suppose the three budget-split constraints
+\begin{align}
+\epsg                                &\;\le\; \theta''\,\epsH\,\sdel &&\textnormal{(C-snap)}\label{eq:snap-split}\\
+\tfrac{\Ltwo}{2}(S+R^{*})^{2}         &\;\le\; \theta\,\epsH\,\sdel   &&\textnormal{(C-err)}\label{eq:err-split}\\
+\bar\beta\,\kappa\,\bar g        &\;\le\; \theta'\,\epsH\,\sdel  &&\textnormal{(C-mom)}\label{eq:mom-split}
+\end{align}
+are satisfied. Then $\glow > 0$ and, on $\mathcal{G}_{0}\cap\mathcal{L}_{T}$,
+for every $k\in\{0,\dots,T\}$:
+\begin{enumerate}[label=\textnormal{(\roman*)}]
+\item $\norm{u_{k}} \;\le\; S+R^{*}$ \hfill \textnormal{(confinement)},
+\item $\norm{g_{k}} \;\ge\; \glow$ \hfill \textnormal{(gradient floor)},
+\item $|c_{k}| \;\ge\; \prod_{j=0}^{k-1}\bigl(1+\gamma\,\alpha_{j}\,\epsH\bigr)\,|c_{0}|
+\;\ge\; (1+\gamma\,\amin\,\epsH)^{k}\,|c_{0}|$
+with $|c_{0}|\ge\sdel$ \hfill \textnormal{(geometric growth)}.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\proofpara{Positivity of $\glow$.}
+By \eqref{eq:glow-def} and the constraints (C-snap), (C-err),
+\[
+\glow \;=\; \epsH\sdel - \epsg - \tfrac{\Ltwo}{2}(S+\Rstar)^2
+\;\ge\; (1 - \theta - \theta'')\,\epsH\,\sdel \;>\; 0,
+\]
+since $\theta+\theta'' < 1$. The remainder of the proof is by induction on $k$:
+the inductive hypothesis at step $k$ is that (i)--(iii) hold at every index
+$j\in\{0,\dots,k\}$ (strong form; this is what makes $\beta_{k}$, which
+involves $\norm{g_{k-1}}$, controllable).
+
+\proofpara{Base case ($k=0$).}
+\emph{Confinement.} $u_0 = \xi$, so $\norm{u_0} = \norm{\xi} \le \Rstar \le S+\Rstar$.
+
+\emph{Growth.} $c_0 = \inner{\xi}{\vmin}$ and the event $\mathcal{G}_0$ is
+defined precisely as $|c_0|\ge\sdel$.
+
+\emph{Floor.} Project the model identity~\eqref{eq:graderror-snap} at $x_0$
+on $\vmin$ and apply the reverse triangle inequality with $|\lmin|\ge\epsH$,
+the snapshot trigger $\norm{g_{\snap}}\le\epsg$, and the growth bound just
+established:
+\[
+\norm{g_0}
+\;\ge\; |\lmin||c_0| - \norm{g_{\snap}} - \norm{\tilde e_0}
+\;\ge\; \epsH\sdel - \epsg - \tfrac{\Ltwo}{2}(\Rstar)^2
+\;\ge\; \glow,
+\]
+where the last step uses $(\Rstar)^2\le(S+\Rstar)^2$ in the definition of $\glow$.
+
+\proofpara{Inductive step.}
+Assume invariants (i), (ii), (iii) hold at every index $j \le k$ for some
+$0 \le k < T$. We establish them at step $k+1$ in the order: (i) confinement,
+then growth (iii), then floor (ii). Each sub-claim uses specific tools, which we
+identify line-by-line.
+
+\subparagraph{Confinement at $k+1$.}
+\emph{Claim.} $\|u_{k+1}\| \le S + \Rstar$.
+
+\emph{Why this is direct from \Cref{lem:localization}, not from the recurrence.}
+\Cref{lem:localization} establishes $\|u_j\| \le S + \Rstar$ \emph{uniformly}
+for every $j \in \{0,\dots,T\}$ on $\mathcal{L}_T$. The proof of that lemma
+uses improve-or-localize applied to the entire window --- a global descent
+identity. Since we are conditioning on $\mathcal{L}_T$ and $k+1 \le T$,
+the bound \eqref{eq:confine} applies at index $k+1$ with no further work:
+\[
+\|u_{k+1}\| \;\le\; S+\Rstar \quad\text{by \eqref{eq:confine} at }j=k+1.
+\]
+Note that this step does \emph{not} use any inductive hypothesis at $k$.
+Confinement is not propagated step-by-step. \Cref{rem:confinement-needs-imploc}
+explains why: the projection $|c_{k+1}| \le \|u_{k+1}\|$ only recovers the
+$\vmin$-component, so step-local control of $|c_{k+1}|$ alone cannot
+bound $\|u_{k+1}\|$.
+
+\subparagraph{Setting up the recurrence.}
+The recurrence \eqref{eq:c-lower}, evaluated at index $k$, reads
+\begin{equation}\label{eq:c-recurrence-bis}
+|c_{k+1}| \;\ge\; (1+\alpha_{k}\epsH)\,|c_k|
+   \;-\; \alpha_{k}\,\epsg
+   \;-\; \alpha_{k}\,\beta_k\,|\eta_k|
+   \;-\; \alpha_{k}\,\|\tilde e_k\|.
+\end{equation}
+We bound each of the three negative terms by a fraction $\theta_\bullet$ of
+the geometric driver $\alpha_{k}\epsH|c_k|$. The key observation is that the
+constraints (C-snap), (C-err), (C-mom) are $\alpha_k$-free: each absorption is
+proved \emph{before} multiplying by the stepsize, and is then multiplied by
+the \emph{same} $\alpha_{k}$ on both sides, so variable stepsizes cost
+nothing here.
+
+\subparagraph{Bound on snapshot forcing.}
+\emph{Claim.} $\alpha_k\epsg \le \theta''\alpha_k\epsH\,|c_k|$.
+
+\emph{Tools.} (C-snap), inductive hypothesis (iii) at $k$.
+
+\emph{Argument.}
+\begin{align*}
+\alpha_k\,\epsg
+&\;\le\; \alpha_k\,\theta''\,\epsH\,\sdel &&\text{(multiply (C-snap) by }\alpha_k\text{)} \\
+&\;\le\; \alpha_k\,\theta''\,\epsH\,|c_k| &&\text{(by (iii): } |c_k| \ge |c_0| \ge \sdel \text{)}.
+\end{align*}
+
+\subparagraph{Bound on quadratic-model error.}
+\emph{Claim.} $\alpha_k\|\tilde e_k\| \le \theta\alpha_k\epsH\,|c_k|$.
+
+\emph{Tools.} \Cref{lem:graderror} (eq.~\eqref{eq:graderror-snap}),
+inductive hypothesis (i) at $k$, (C-err), inductive hypothesis (iii) at $k$.
+
+\emph{Argument.} By \Cref{lem:graderror} applied at $x_k$,
+$\|\tilde e_k\| \le \tfrac{\Ltwo}{2}\|u_k\|^2$. The IH (i) at $k$ gives
+$\|u_k\| \le S+\Rstar$, so
+\[
+\|\tilde e_k\| \;\le\; \tfrac{\Ltwo}{2}(S+\Rstar)^2.
+\]
+Now (C-err) bounds the right-hand side by $\theta\epsH \sdel$, and (iii) at $k$
+upgrades $\sdel$ to $|c_k|$:
+\[
+\|\tilde e_k\| \;\le\; \tfrac{\Ltwo}{2}(S+\Rstar)^2 \;\le\; \theta\,\epsH\,\sdel \;\le\; \theta\,\epsH\,|c_k|.
+\]
+Multiplying by $\alpha_k$:
+\[
+\alpha_k\,\|\tilde e_k\| \;\le\; \theta\,\alpha_k\,\epsH\,|c_k|.
+\]
+
+\subparagraph{Bound on the momentum term.}
+\emph{Claim.} $\alpha_k\,\beta_k|\eta_k| \le \theta'\,\alpha_k\,\epsH\,|c_k|$.
+
+\emph{Tools.} The algorithm's restart test (\Cref{algo:PNCG}, with $q=1$),
+gradient upper bound \eqref{eq:barg-def}, gradient floor (ii) at indices
+$k-1$ and $k$, (C-mom), IH (iii) at $k$.
+
+\emph{Argument.} First bound $|\eta_k|$:
+\[
+|\eta_k| \;=\; |\inner{d_{k-1}}{\vmin}| \;\le\; \|d_{k-1}\|.
+\]
+By the algorithm's restart test (with $q = 1$, $\kappa \ge 1$),
+$\|d_{k-1}\| \le \kappa\|g_{k-1}\|$ regardless of whether restart fired:
+\begin{itemize}
+\item If restart fired at $k-1$: $d_{k-1} = -g_{k-1}$, so $\|d_{k-1}\| = \|g_{k-1}\| \le \kappa\|g_{k-1}\|$ (using $\kappa \ge 1$).
+\item If restart did not fire: the contrapositive of the restart condition gives $\|d_{k-1}\| < \kappa\|g_{k-1}\|$.
+\end{itemize}
+Combined with $\|g_{k-1}\| \le \gup$ from \eqref{eq:barg-def}:
+\[
+|\eta_k| \;\le\; \kappa\,\|g_{k-1}\| \;\le\; \kappa\,\gup.
+\]
+
+For $\beta_k$, the FR formula together with the upper bound
+\eqref{eq:barg-def} at index $k$ and the gradient floor at index $k-1$ (which
+we have by the strong IH (ii)) gives
+$\beta_k = \|g_k\|^2/\|g_{k-1}\|^2 \le \gup^2/\glow^2 = \bbeta$.
+Then
+\[
+\beta_k\,|\eta_k| \;\le\; \bbeta\,\kappa\,\gup.
+\]
+By (C-mom), this is at most $\theta'\epsH \sdel$; by (iii) at $k$,
+$\sdel \le |c_k|$, so
+\[
+\beta_k\,|\eta_k| \;\le\; \bbeta\,\kappa\,\gup \;\le\; \theta'\,\epsH\,\sdel \;\le\; \theta'\,\epsH\,|c_k|.
+\]
+Multiplying by $\alpha_k$:
+\[
+\alpha_k\,\beta_k\,|\eta_k| \;\le\; \theta'\,\alpha_k\,\epsH\,|c_k|.
+\]
+
+\emph{Edge case at $k = 0$.} The convention $d_{-1} = 0$ encoding the
+post-perturbation momentum reset gives $\eta_0 = \inner{d_{-1}}{\vmin} = 0$,
+so the bound holds trivially at $k=0$ without invoking (C-mom) (and without a
+floor at index $-1$).
+
+\subparagraph{Growth at $k+1$.}
+Substituting the three bounds into \eqref{eq:c-recurrence-bis}:
+\begin{align*}
+|c_{k+1}|
+&\;\ge\; (1+\alpha_{k}\epsH)\,|c_k|
+   - \theta''\alpha_{k}\epsH\,|c_k|
+   - \theta'\alpha_{k}\epsH\,|c_k|
+   - \theta\alpha_{k}\epsH\,|c_k| \\
+&\;=\; \bigl(1 + \gamma\,\alpha_{k}\,\epsH\bigr)\,|c_k|,
+\end{align*}
+using $\gamma = 1 - \theta - \theta' - \theta''$. Combined with IH (iii) at
+$k$ and $\alpha_{k}\ge\amin$:
+\[
+|c_{k+1}|
+\;\ge\; \prod_{j=0}^{k}\bigl(1+\gamma\alpha_{j}\epsH\bigr)\,|c_0|
+\;\ge\; (1 + \gamma\,\amin\,\epsH)^{k+1}\,|c_0|,
+\]
+with $|c_0| \ge \sdel$ on $\mathcal{G}_0$ (preserved from the base case).
+
+\subparagraph{Floor at $k+1$.}
+\emph{Claim.} $\|g_{k+1}\| \ge \glow$.
+
+\emph{Tools.} \Cref{lem:graderror} at $x_{k+1}$, trigger bound on
+$\|g_{\snap}\|$, confinement (i) at $k+1$ (just established), growth (iii) at $k+1$
+(just established), definition of $\glow$ \eqref{eq:glow-def}.
+
+\emph{Argument.} \Cref{lem:graderror} gives
+$\grad f(x_{k+1}) = g_{\snap} + H\,u_{k+1} + \tilde e_{k+1}$ where
+$H = \hess f(\snap)$. Projecting on $\vmin$:
+\[
+\inner{g_{k+1}}{\vmin}
+\;=\; \inner{g_{\snap}}{\vmin}
+   + \lambda_{\min}\,c_{k+1}
+   + \inner{\tilde e_{k+1}}{\vmin}.
+\]
+Since $\|g_{k+1}\| \ge |\inner{g_{k+1}}{\vmin}|$ (Cauchy--Schwarz, $\vmin$
+unit vector), the reverse triangle inequality gives
+\[
+\|g_{k+1}\|
+\;\ge\; |\lambda_{\min}|\cdot|c_{k+1}|
+       - \|g_{\snap}\|
+       - \|\tilde e_{k+1}\|.
+\]
+Now plug in:
+\begin{itemize}
+\item $|\lambda_{\min}| \ge \epsH$ (trigger condition);
+\item $|c_{k+1}| \ge \sdel$ (growth (iii) at $k+1$, combined with $|c_0| \ge \sdel$);
+\item $\|g_{\snap}\| \le \epsg$ (trigger condition);
+\item $\|\tilde e_{k+1}\| \le \tfrac{\Ltwo}{2}\|u_{k+1}\|^2 \le \tfrac{\Ltwo}{2}(S+\Rstar)^2$ (\Cref{lem:graderror} and confinement (i) at $k+1$).
+\end{itemize}
+This yields
+\[
+\|g_{k+1}\|
+\;\ge\; \epsH\,\sdel - \epsg - \tfrac{\Ltwo}{2}(S+\Rstar)^2
+\;=\; \glow,
+\]
+by the definition \eqref{eq:glow-def}, which completes the induction.
+\end{proof}
+
+\begin{remark}[Why step-local confinement fails]\label{rem:confinement-needs-imploc}
+The projection $|c_{k+1}|\le\norm{u_{k+1}}$ recovers only the $\vmin$-component
+of the displacement; bounding that component does not control the orthogonal
+components. Confinement at step $k+1$ therefore cannot be deduced from the
+recurrence~\eqref{eq:c-lower} alone --- it requires the global descent identity
+(\Cref{lem:improve}), which enters through the conditioning on $\mathcal{L}_T$
+in~\eqref{eq:LT}.
+\end{remark}
+
+
+% =============================================================================
+\subsection{Step VIII --- Escape theorem}\label{sub:escape}
+% =============================================================================
+
+\paragraph{Rationale.}
+Using invariant~(iii) of the induction we show that $|c_{T}|$ exceeds
+$(1+\gamma\alpha_k\epsH)^{T}\sdel$; using invariant~(i) we know
+$|c_{T}|\le\norm{u_{T}}\le S+\Rstar$. Choosing $T$ so that the first quantity
+exceeds the second produces a contradiction, hence
+$\mathcal{G}_{0}\cap\mathcal{L}_{T}=\emptyset$: on the good perturbation event,
+the localization case is impossible, so the function value must drop by at
+least $F$ within the window.
+
+\begin{theorem}[Single-trajectory saddle escape]\label{thm:escape-single}
+Define
+\begin{equation}\label{eq:Phi-def}
+\Phi \;:=\; \log\!\Bigl(\frac{S+R^{*}}{\sdel}\Bigr)
+\end{equation}
+and choose the window length
+\begin{equation}\label{eq:Tchoice}
+T \;:=\; \left\lceil
+\frac{\Phi}{\log\!\bigl(1+\gamma\,\amin\,\epsH\bigr)}
+\right\rceil + 1.
+\end{equation}
+Under the assumptions of \Cref{lem:induction},
+\[
+\Pr\Bigl(\,f(x_{0}) - \min_{0\le k\le T}f(x_{k}) \;\ge\; F\,\Bigr)
+\;\ge\; \Pr(\mathcal{G}_{0}) \;\ge\; 1 - \delta.
+\]
+\end{theorem}
+
+\begin{proof}
+We show $\mathcal{G}_{0}\cap\mathcal{L}_{T} = \emptyset$. Suppose, for
+contradiction, that a sample point lies in
+$\mathcal{G}_{0}\cap\mathcal{L}_{T}$. By \Cref{lem:induction}(iii),
+\[
+|c_{T}| \;\ge\; (1+\gamma\,\amin\,\epsH)^{T}\,\sdel .
+\]
+Since $\lceil y\rceil+1>y$ for every $y$, the choice~\eqref{eq:Tchoice} gives
+\[
+T\,\log(1+\gamma\,\amin\,\epsH) \;>\; \Phi,
+\qquad\text{hence}\qquad
+(1+\gamma\,\amin\,\epsH)^{T}\,\sdel \;>\; e^{\Phi}\sdel \;=\; S+R^{*},
+\]
+so $|c_{T}|>S+R^{*}$. On the other hand, by \Cref{lem:induction}(i) and
+Cauchy--Schwarz, $|c_{T}|\le\norm{u_{T}}\le S+R^{*}$. Contradiction.
+Therefore on $\mathcal{G}_{0}$ the event $\mathcal{L}_{T}$ fails, i.e.\ the
+function value drops by at least $F$ within the escape window; since
+$\Pr(\mathcal{G}_{0})\ge1-\delta$ by \Cref{lem:anticoncentration}, the
+conclusion follows.
+\end{proof}
+
+\section{Setting and the constraint system}\label{sec:setting}
+
+Throughout, $L_1$ is the gradient Lipschitz constant, $L_2$ the Hessian
+Lipschitz constant, $\epsg,\epsH>0$ the tolerances, $d$ the dimension,
+$\kappa$ the momentum constant from the restart condition, $\delta\in(0,1)$
+the per-window failure probability, and $\LL := f(x_0^{\mathrm{alg}}) -
+f_{\mathrm{low}}$ the total decrease budget. Define
+\begin{equation}\label{eq:defs}
+a \;:=\; \sqrt{\frac{\pi}{2(d+2)}}, \qquad
+\Rstar \;:=\; \frac{a\,\epsH\,\delta}{L_2}, \qquad
+\sdel \;:=\; \frac{a^2\,\epsH\,\delta^2}{L_2},
+\end{equation}
+the perturbation radius and the guaranteed initial projection on the escape
+direction (probability $\ge 1-\delta$). Direct computation from
+\eqref{eq:defs} gives the exact identities
+\begin{equation}\label{eq:identities}
+\frac{\Rstar}{\sdel} \;=\; \frac{1}{a\,\delta}, \qquad
+L_2\,(\Rstar)^2 \;=\; \epsH\,\sdel .
+\end{equation}
+
+The escape-window analysis (Sections~7.2--7.5 of the main document) is valid
+provided the parameters $S$ (localization radius from the post-perturbation
+start), $T$ (window length), $F$ (per-window decrease threshold) and the
+splits $\theta,\theta',\theta'',\gamma>0$ satisfy the following system, in
+which $\gup := \epsg + L_1(S+\Rstar)$ and
+$\glow := \epsH\sdel - \epsg - \tfrac{L_2}{2}(S+\Rstar)^2$ are the upper and
+lower gradient envelopes over the window, $\alpha_k$ is the in-window stepsize satisfying $\alpha_k \in [\amin, 1/\Lone]$ with $\amin = \sigma / (\Lone \kappa^2)$, and $\bbeta$ the momentum-coefficient envelope
+($\bbeta \le \gup^2/\glow^2$ for Fletcher--Reeves):
+\begin{alignat}{2}
+&\text{(C-snap)}: \quad && \epsg \;\le\; \theta''\,\epsH\,\sdel,
+\label{eq:Csnap}\\
+&\text{(C-err)}: \quad && \frac{L_2}{2}\,(S+\Rstar)^2 \;\le\;
+\theta\,\epsH\,\sdel, \label{eq:Cerr}\\
+&\text{(C-mom)}: \quad && \bbeta\,\kappa\,\gup \;\le\;
+\theta'\,\epsH\,\sdel, \label{eq:Cmom}\\
+&\text{(C-win)}: \quad && T \;\ge\;
+\frac{\log\!\big((S+\Rstar)/\sdel\big)}{\log(1+\gamma\,\amin\,\epsH)},
+\label{eq:Cwin}
+\end{alignat}
+together with the budget constraint
+\begin{equation}\label{eq:budget}
+\theta + \theta' + \theta'' + \gamma \;\le\; 1 .
+\end{equation}
+
+% NOTE: outside the perturbation window, the stepsize remains a free
+% placeholder. Inside the window alpha_k in {sigma/(L1 kappa^2), 1/L1}
+% (Assumption \ref{ass:pq}); the growth rate is governed by alpha_min, and the
+% improve-or-localize constant is 2/L1 uniformly, independently of alpha_k.
+% See Remark~\ref{rem:optalpha}.
+
+Define the fixed quantity
+\begin{equation}\label{eq:thetamin}
+\thetamin \;:=\; \frac{\epsg}{\epsH\,\sdel}
+\qquad\text{(so (C-snap) reads } \theta'' \ge \thetamin\text{)},
+\end{equation}
+and the dimensionless \emph{regime parameter}
+\begin{equation}\label{eq:lambda}
+\lambda \;:=\; \frac{L_1\,\Rstar}{\epsH\,\sdel}
+\;\overset{\eqref{eq:identities}}{=}\; \frac{L_1}{a\,\delta\,\epsH}
+\;=\; \frac{L_1}{\delta\,\epsH}\sqrt{\frac{2(d+2)}{\pi}} .
+\end{equation}
+Small $\lambda$ means the perturbation geometry is large relative to the
+gradient-Lipschitz scale; ``deep regime'' below means $\lambda \to 0$.
+
+Finally, normalize the localization radius (we write $\varsigma$, reserving
+$\sigma$ for the algorithm's sufficient-descent constant, which enters Step~IX
+through $\amin = \sigma/(L_1\kappa^2)$):
+\begin{equation}\label{eq:sigma}
+\varsigma \;:=\; \frac{L_1\,S}{\epsH\,\sdel}, \qquad\text{so that}\qquad
+\frac{L_1\,(S+\Rstar)}{\epsH\,\sdel} \;=\; \varsigma + \lambda .
+\end{equation}
+
+\section{The two envelope bounds on $S$}\label{sec:envelopes}
+
+\begin{lemma}[Structural identity and lower bound on $\theta$]
+\label{lem:structural}
+For every $S \ge 0$, \emph{(C-err)} implies $\theta \ge 1/2$, with strict
+inequality whenever $S>0$.
+\end{lemma}
+
+\begin{proof}
+By \eqref{eq:identities}, $\tfrac{L_2}{2}(\Rstar)^2 =
+\tfrac12\,\epsH\sdel$ exactly. Since $S\ge 0$,
+$\tfrac{L_2}{2}(S+\Rstar)^2 \ge \tfrac{L_2}{2}(\Rstar)^2 =
+\tfrac12\epsH\sdel$, so \eqref{eq:Cerr} forces
+$\theta\,\epsH\sdel \ge \tfrac12\epsH\sdel$, i.e.\ $\theta\ge 1/2$.
+If $S>0$ the first inequality is strict.
+\end{proof}
+
+\begin{lemma}[Error envelope (B-err)]\label{lem:Berr}
+\emph{(C-err)} is equivalent to
+\begin{equation}\label{eq:Berr}
+S + \Rstar \;\le\; \sqrt{2\theta}\,\Rstar,
+\qquad\text{i.e.}\qquad
+\varsigma \;\le\; \serr(\theta) \;:=\; \big(\sqrt{2\theta}-1\big)\,\lambda .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+By \eqref{eq:identities},
+$\tfrac{L_2}{2}(S+\Rstar)^2 \le \theta\epsH\sdel
+\iff (S+\Rstar)^2 \le 2\theta(\Rstar)^2
+\iff S+\Rstar \le \sqrt{2\theta}\,\Rstar$ (both sides nonnegative).
+Multiplying by $L_1/(\epsH\sdel)$ and using \eqref{eq:lambda},
+\eqref{eq:sigma} gives $\varsigma+\lambda \le \sqrt{2\theta}\,\lambda$.
+\end{proof}
+
+\begin{lemma}[Momentum envelope (B-mom), Fletcher--Reeves]\label{lem:Bmom}
+Suppose \emph{(C-err)} holds and $B := 1-\theta-\thetamin > 0$. Then a
+sufficient condition for \emph{(C-mom)} with $\bbeta \le \gup^2/\glow^2$ is
+\begin{equation}\label{eq:Bmom}
+\varsigma \;\le\; \smom(\theta,\theta')
+\;:=\; \Big(\frac{\theta'\,B^2}{\kappa}\Big)^{1/3} - \thetamin - \lambda .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Using $\epsg = \thetamin\,\epsH\sdel$ (definition \eqref{eq:thetamin}) and
+\eqref{eq:Cerr},
+\begin{equation}\label{eq:glow-lb}
+\glow \;=\; \epsH\sdel - \epsg - \tfrac{L_2}{2}(S+\Rstar)^2
+\;\ge\; \epsH\sdel\,\big(1 - \thetamin - \theta\big)
+\;=\; B\,\epsH\,\sdel .
+\end{equation}
+Since $x \mapsto \kappa\gup^3/x^2$ is decreasing on $x>0$, the lower bound
+\eqref{eq:glow-lb} gives the \emph{upper} bound
+$\bbeta\kappa\gup \le \kappa\gup^3/\glow^2 \le
+\kappa\gup^3/(B\epsH\sdel)^2$ --- note the direction: bounding $\glow$
+from \emph{below} is what makes the substitution sufficient rather than
+merely necessary. It therefore suffices for \eqref{eq:Cmom} that
+\[
+\frac{\kappa\,\gup^3}{B^2(\epsH\sdel)^2} \;\le\; \theta'\,\epsH\,\sdel
+\quad\Longleftrightarrow\quad
+\gup \;\le\; \Big(\frac{\theta' B^2}{\kappa}\Big)^{1/3}\epsH\,\sdel .
+\]
+With $\gup = \epsg + L_1(S+\Rstar) =
+\big(\thetamin + \varsigma + \lambda\big)\epsH\sdel$ by \eqref{eq:thetamin},
+\eqref{eq:sigma}, this is exactly \eqref{eq:Bmom}.
+\end{proof}
+
+The admissible localization radius is therefore
+\begin{equation}\label{eq:min}
+\boxed{\;\varsigma \;\le\; \min\big\{\serr(\theta),\;
+\smom(\theta,\theta')\big\}.\;}
+\end{equation}
+% NOTE: the previous resolution treated (C-mom) as the unique binding
+% constraint and evaluated S from saturated (B-mom) at theta = 1/2. By
+% Lemma~\ref{lem:Berr}, serr(1/2) = 0: that point is infeasible for any S > 0.
+% See Remark~\ref{rem:previous}.
+
+\begin{lemma}[Necessary regime condition]\label{lem:regime-nec}
+If $\varsigma > 0$ is admissible for some splits satisfying \eqref{eq:budget},
+then
+\begin{equation}\label{eq:regime-nec}
+\lambda + \thetamin \;<\; \frac{B}{\kappa^{1/3}}
+\;\le\; \frac{1}{2\,\kappa^{1/3}} .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+$\smom > 0$ requires $(\theta' B^2/\kappa)^{1/3} > \thetamin+\lambda$.
+Since $\theta' \le B$ by \eqref{eq:budget} ($\theta'+\gamma \le B$ and
+$\gamma>0$), $(\theta' B^2/\kappa)^{1/3} \le B/\kappa^{1/3}$, and
+$B = 1-\theta-\thetamin \le 1/2$ by Lemma~\ref{lem:structural}.
+\end{proof}
+
+Unpacking \eqref{eq:lambda}, condition \eqref{eq:regime-nec} requires
+$\epsH\,\delta > 2\kappa^{1/3}L_1\sqrt{2(d+2)/\pi}$: the regime restriction
+of the single-trajectory analysis. It is \emph{unchanged} by the corrected
+optimization below; only the value of $S$ inside the regime changes.
+
+\section{Optimization of the splits}\label{sec:optimization}
+
+\subsection{The objective and its exact surrogate}
+
+The quantities derived in Section~\ref{sec:derived} give
+$\Niter \le 2T^2\LL/(L_1 S^2) + T$ with
+$T \le \Phi/(\gamma\,\amin\,\epsH) + \Phi + 2$ and
+$\Phi = \log((S+\Rstar)/\sdel)$. We therefore \emph{maximize}
+\begin{equation}\label{eq:objective}
+J \;:=\; \gamma\,\varsigma
+\end{equation}
+over the splits, subject to \eqref{eq:min}, \eqref{eq:budget},
+$\theta\ge 1/2$, $\theta'' \ge \thetamin$.
+
+\begin{remark}[Exactness of the surrogate]\label{rem:surrogate}
+$\Niter$ and $J$ are related by
+$\Niter \lesssim T^2/S^2 \propto 1/(\gamma\varsigma)^2 = 1/J^2$ up to three
+explicitly bounded discrepancies: (i) $\log(1+x)\in[x/(1+x),x]$, so under
+$\gamma\,\amin\,\epsH\le 1$ the bound on $T$ is exact within a factor $2$,
+hence $\Niter$ within a factor $4$; (ii) $\Phi$ depends on the splits only
+through $\log(S+\Rstar)$, a logarithmic variation; (iii) the additive
+terms $+2$, $+T$. Consequently, maximizing $J$ minimizes the
+$\Niter$ bound up to an explicit absolute factor; combined with
+Proposition~\ref{prop:nearopt} this yields
+$\Niter^{\mathrm{canonical}} \le 16\,\Niter^{\mathrm{opt}}$
+under \eqref{eq:Rprime}. No claim sharper than this factor is made.
+\end{remark}
+
+\subsection{Structure of the optimum}
+
+\begin{lemma}[$\theta''$ is pinned]\label{lem:thetapp}
+At any maximizer of $J$ with $J>0$, $\theta'' = \thetamin$.
+\end{lemma}
+
+\begin{proof}
+$\theta''$ enters $J$ only through the budget \eqref{eq:budget}: neither
+$\serr$ nor $\smom$ depends on $\theta''$ (the quantity $\thetamin$ in
+\eqref{eq:Bmom} is the fixed problem datum \eqref{eq:thetamin}, not the split
+$\theta''$, and $B$ is defined with $\thetamin$). If $\theta'' > \thetamin$,
+replace $(\theta'',\gamma)$ by $(\thetamin,\ \gamma + \theta''-\thetamin)$:
+all constraints still hold and $J$ strictly increases.
+\end{proof}
+
+In view of Lemma~\ref{lem:thetapp} we set $\theta'' = \thetamin$, write
+\begin{equation}\label{eq:MB}
+M \;:=\; 1 - \thetamin, \qquad B \;=\; M - \theta,
+\qquad \gamma \;=\; B - \theta' ,
+\end{equation}
+and saturate the budget \eqref{eq:budget} (any slack is given to $\gamma$,
+which strictly increases $J$). The remaining variables are
+$(\theta,\theta') \in [1/2, M)\times(0, B)$.
+
+\begin{lemma}[Balance at the optimum]\label{lem:balance}
+Assume $J^\star := \sup J > 0$. Then the supremum is attained, and at every
+maximizer
+\begin{equation}\label{eq:balance}
+\serr(\theta) \;=\; \smom(\theta,\theta'),
+\qquad\text{i.e.}\qquad
+\Big(\frac{\theta' B^2}{\kappa}\Big)^{1/3}
+\;=\; \thetamin + \sqrt{2\theta}\,\lambda .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+$J$ is continuous on the compact set
+$\{\theta\in[1/2,M],\ \theta'\in[0,M-\theta]\}$ (with
+$\varsigma := \min\{\serr,\smom\}^+$), so a maximizer exists.
+
+\emph{Case $\smom > \serr$ at a maximizer.} Then
+$\smom > \serr \ge 0$ forces $\theta' > 0$. Decrease $\theta'$ by
+$\eta>0$ and give $\eta$ to $\gamma$. By continuity of $\smom$ in
+$\theta'$, for $\eta$ small enough still $\smom \ge \serr$, so
+$\varsigma = \serr$ is unchanged while $\gamma$ strictly increases:
+$J$ strictly increases, contradiction.
+
+\emph{Case $\smom < \serr$ at a maximizer.} Then $J>0$ forces
+$\smom>0$, and $\serr > \smom > 0$ forces $\sqrt{2\theta}>1$, i.e.\
+$\theta > 1/2$ strictly. Decrease $\theta$ by $\eta>0$ and give $\eta$ to
+$\gamma$ (keeping $\theta'$): $B$ increases, so $\smom$ strictly increases;
+$\serr$ decreases continuously, so for $\eta$ small enough still
+$\serr > \smom$. Hence $\varsigma = \smom$ strictly increased and $\gamma$
+strictly increased: $J$ strictly increases, contradiction.
+
+Therefore $\serr = \smom$ at every maximizer; the displayed equivalent form
+follows by adding $\thetamin+\lambda$ to $\serr = (\sqrt{2\theta}-1)\lambda$
+and cubing.
+\end{proof}
+
+\subsection{Exact upper bound and the canonical splits}
+
+\begin{lemma}[Exact upper bound on the objective]\label{lem:UB}
+Let $M > 1/2$ and
+\begin{equation}\label{eq:tstar}
+\tstar \;:=\; \frac{1+\sqrt{1+6M}}{3} \;\in\; \big(1,\sqrt{2M}\,\big).
+\end{equation}
+Then for \emph{every} feasible choice of splits,
+\begin{equation}\label{eq:UB}
+J \;\le\; \lambda\,\tstar\,(\tstar-1)^2 .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+For any feasible point, $J = \gamma\sigma \le \gamma\,\serr \le
+B\,\serr = (M-\theta)\big(\sqrt{2\theta}-1\big)\lambda$, using
+$\gamma = B - \theta' \le B$. Substitute $t := \sqrt{2\theta} \in
+[1,\sqrt{2M}]$ and define
+\[
+h(t) \;:=\; \Big(M - \tfrac{t^2}{2}\Big)(t-1),
+\qquad
+h'(t) \;=\; -\tfrac{3}{2}t^2 + t + M,
+\qquad
+h''(t) \;=\; -3t+1 < 0 \ \ (t\ge 1).
+\]
+$h$ is strictly concave on $[1,\sqrt{2M}]$ with
+$h'(1) = M - \tfrac12 > 0$ and
+$h'(\sqrt{2M}) = \sqrt{2M} - 2M < 0$ (since $M>1/2$), so $h$ has a unique
+interior maximizer, the positive root of $h'$, which is \eqref{eq:tstar}.
+At $\tstar$ the first-order condition gives the exact identity
+\begin{equation}\label{eq:FOC}
+M \;=\; \frac{3\tstar^2 - 2\tstar}{2}
+\qquad\Longrightarrow\qquad
+M - \frac{\tstar^2}{2} \;=\; \tstar^2 - \tstar \;=\; \tstar(\tstar-1),
+\end{equation}
+hence $h(\tstar) = \tstar(\tstar-1)^2$, which is \eqref{eq:UB}.
+\end{proof}
+
+\begin{definition}[Canonical splits]\label{def:canonical}
+With $\tstar$ as in \eqref{eq:tstar}, set
+\begin{equation}\label{eq:canonical}
+\theta_\star := \frac{\tstar^2}{2}, \qquad
+\theta''_\star := \thetamin, \qquad
+B_\star := M - \theta_\star
+\overset{\eqref{eq:FOC}}{=} \tstar(\tstar-1), \qquad
+\theta'_\star := \frac{\kappa\,\big(\thetamin +
+\tstar\lambda\big)^3}{B_\star^2}, \qquad
+\gamma_\star := B_\star - \theta'_\star ,
+\end{equation}
+and take $\sigma$ at its admissible maximum,
+$\sigma_\star := (\tstar - 1)\,\lambda$, i.e.
+\begin{equation}\label{eq:Sstar}
+S \;=\; (\tstar-1)\,\Rstar
+\;=\; (\tstar - 1)\,\sqrt{\frac{\pi}{2(d+2)}}\;\frac{\epsH\,\delta}{L_2},
+\qquad
+S + \Rstar \;=\; \tstar\,\Rstar .
+\end{equation}
+\end{definition}
+
+\begin{lemma}[Feasibility of the canonical splits]\label{lem:feasible}
+Assume $\thetamin < 1/2$ (tolerance compatibility, equivalently
+$\epsg < \tfrac12\,\epsH\sdel$) and the \emph{regime restriction}
+\begin{equation}\label{eq:Rprime}
+\thetamin + \tstar\,\lambda \;\le\; \frac{B_\star}{(2\kappa)^{1/3}} .
+\tag{R$'$}
+\end{equation}
+Then the canonical splits are feasible: \emph{(C-snap)}, \emph{(C-err)},
+\emph{(C-mom)} all hold with $S$ as in \eqref{eq:Sstar},
+$\theta'_\star \le B_\star/2$, and $\gamma_\star \ge B_\star/2 > 0$.
+Moreover \emph{(C-err)} and \emph{(C-mom)} are \emph{saturated} (hold with
+equality in the envelope bounds \eqref{eq:Berr}, \eqref{eq:Bmom}).
+\end{lemma}
+
+\begin{proof}
+$\thetamin<1/2$ gives $M>1/2$, so $\tstar\in(1,\sqrt{2M})$ and
+$\theta_\star = \tstar^2/2 \in (1/2, M)$, $B_\star>0$.
+\eqref{eq:Rprime} cubed reads
+$\kappa(\thetamin+\tstar\lambda)^3 \le B_\star^3/2$, i.e.\
+$\theta'_\star \le B_\star/2$, whence $\gamma_\star \ge B_\star/2 > 0$ and
+\eqref{eq:budget} holds with equality by construction.
+(C-err): by \eqref{eq:Sstar} and \eqref{eq:identities},
+$\tfrac{L_2}{2}(S+\Rstar)^2 = \tfrac{\tstar^2}{2}\,\epsH\sdel =
+\theta_\star\,\epsH\sdel$ --- equality.
+(C-mom): $\gup = (\thetamin + \tstar\lambda)\,\epsH\sdel$ by
+\eqref{eq:sigma}, and by \eqref{eq:glow-lb},
+$\glow \ge B_\star\,\epsH\sdel$, so
+\[
+\bbeta\,\kappa\,\gup \;\le\; \frac{\kappa\,\gup^3}{\glow^2}
+\;\le\; \frac{\kappa\,(\thetamin+\tstar\lambda)^3}{B_\star^2}\;\epsH\sdel
+\;=\; \theta'_\star\,\epsH\,\sdel ,
+\]
+with equality in the last step by definition of $\theta'_\star$:
+\eqref{eq:Cmom} holds and the envelope \eqref{eq:Bmom} is saturated, i.e.\
+$\smom(\theta_\star,\theta'_\star) = \sigma_\star = \serr(\theta_\star)$,
+which is the balance equation \eqref{eq:balance}.
+\end{proof}
+
+\begin{proposition}[Near-optimality, exact form]\label{prop:nearopt}
+Let
+\begin{equation}\label{eq:rho}
+\rho_\star \;:=\; \frac{\theta'_\star}{B_\star}
+\;=\; \kappa\,\Big(\frac{\thetamin + \tstar\lambda}{\tstar(\tstar-1)}
+\Big)^{3} .
+\end{equation}
+Under the assumptions of Lemma~\ref{lem:feasible},
+\begin{equation}\label{eq:nearopt}
+J_{\mathrm{can}} \;=\; \gamma_\star\,\sigma_\star
+\;=\; (1-\rho_\star)\,\lambda\,\tstar(\tstar-1)^2
+\;\ge\; (1-\rho_\star)\;\sup J ,
+\qquad \rho_\star \le \tfrac12 .
+\end{equation}
+In particular $J_{\mathrm{can}} \ge \tfrac12 \sup J$ always under
+\eqref{eq:Rprime}, and $\rho_\star \to 0$ as
+$\lambda,\thetamin \to 0$: deep in the regime the canonical splits are
+asymptotically exactly optimal.
+\end{proposition}
+
+\begin{proof}
+$J_{\mathrm{can}} = (B_\star - \theta'_\star)(\tstar-1)\lambda =
+(1-\rho_\star)B_\star(\tstar-1)\lambda =
+(1-\rho_\star)\,\tstar(\tstar-1)^2\lambda$ by \eqref{eq:FOC}. Combine with
+the upper bound \eqref{eq:UB}, valid for every feasible point. The bound
+$\rho_\star\le 1/2$ is \eqref{eq:Rprime} cubed.
+\end{proof}
+
+\begin{remark}[Why the previous resolution is invalid]\label{rem:previous}
+The earlier derivation fixed $\theta = 1/2$ (``with infinitesimal margin''),
+declared (C-mom) the binding constraint, and evaluated $S$ from saturated
+(B-mom), obtaining $S + \Rstar = B\,\epsH\sdel/\big(L_1(4\kappa)^{1/3}\big)$
+and hence $S \propto \delta^2$. By Lemma~\ref{lem:Berr}, however,
+$\serr(1/2) = 0$: at $\theta = 1/2$, (C-err) forces $S = 0$, and near
+$\theta=1/2$, $S \le (\sqrt{2\theta}-1)\Rstar \approx (\theta-\tfrac12)\Rstar$
+scales \emph{linearly} in the margin. The value of $S$ used in the previous
+Steps 6--10 violates (C-err) whenever it is positive, deep in the regime
+$\lambda \ll 1$ --- which is precisely where it was invoked. The binding
+structure is in fact: (C-mom) binds only near the boundary of
+\eqref{eq:Rprime}; deep in the regime both constraints bind simultaneously at
+the optimum (Lemma~\ref{lem:balance}), with $S = (\tstar-1)\Rstar \propto
+\delta$, not $\delta^2$. Consequently the previously stated per-window count
+$\Niter \propto L_1^3 L_2^2\,d^2\,\LL/(\epsH^6\delta^4)$ does not correspond
+to any feasible instantiation of the constraint system and must be
+retracted; the feasible count is Theorem~\ref{thm:main} below, which exceeds
+it by the factor $\lambda^{-2}$ (up to absolute constants) inside the
+regime, the two coinciding at the boundary of \eqref{eq:Rprime}.
+\end{remark}
+
+\begin{remark}[Anchor point and the radius $S+2\Rstar$]\label{rem:anchor}
+% NOTE: action item --- audit the ~24 sites where the confinement radius was
+% changed to S + 2R^* and classify each as (a) geometric localization
+% relative to the underlying saddle (harmless) or (b) input to (C-err) or to
+% the definition of \gup (must be snap-anchored).
+All four constraints above are anchored at the \emph{snap point}, where the
+trigger certifies $\lambda_{\min}(\nabla^2 f(\mathrm{snap})) \le -\epsH$;
+the confinement radius from the snap point is $S + \Rstar$ (perturbation
+$\le \Rstar$, in-window travel $\le S$), and this is what enters (C-err) and
+$\gup$. If instead (C-err) is stated with radius $S + \nu\Rstar$ for
+$\nu \ge 1$ (e.g.\ $\nu = 2$ when anchoring at the underlying saddle, at
+distance up to $\Rstar$ from the snap point), the identity of
+Lemma~\ref{lem:structural} becomes
+$\tfrac{L_2}{2}(\nu\Rstar)^2/(\epsH\sdel) = \nu^2/2$, forcing
+$\theta \ge \nu^2/2$; for $\nu = 2$ this gives $\theta \ge 2$, incompatible
+with \eqref{eq:budget}: the system is infeasible. The infeasibility cannot
+be repaired by shrinking the perturbation radius alone: if the perturbation
+radius is $\Rstar/\varrho$ ($\varrho \ge 1$) while the snap-to-saddle
+distance remains $\le \Rstar$, then $\sdel$ scales by $1/\varrho$ and the
+saddle-anchored identity becomes
+$\varrho\,(1+1/\varrho)^2/2 = (\varrho + 2 + 1/\varrho)/2 \ge 2$ for all
+$\varrho \ge 1$. Hence saddle-anchoring of (C-err) is structurally
+infeasible under the present definitions \eqref{eq:defs}; the analysis must
+remain snap-anchored, which is also what the trigger certifies.
+\end{remark}
+
+\section{Derived quantities: $S$, $T$, $F$, $\Niter$}\label{sec:derived}
+
+Throughout this section the canonical splits \eqref{eq:canonical} are in
+force, $S$ is given by \eqref{eq:Sstar}, and the in-window stepsizes satisfy
+$\alpha_k \in \{\sigma/(L_1\kappa^2),\, 1/L_1\} \subset [\amin,\, 1/L_1]$
+(\Cref{ass:pq}), with $\amin = \sigma/(L_1\kappa^2)$.
+
+\paragraph{Window length.} Set
+\begin{equation}\label{eq:Phi}
+\Phi \;:=\; \log\!\Big(\frac{S+\Rstar}{\sdel}\Big)
+\;\overset{\eqref{eq:Sstar},\eqref{eq:identities}}{=}\;
+\log\!\Big(\frac{\tstar}{a\,\delta}\Big)
+\;=\; \log\!\Big(\frac{\tstar}{\delta}\sqrt{\frac{2(d+2)}{\pi}}\Big),
+\qquad
+T \;:=\; \Big\lceil \frac{\Phi}{\log(1+\gamma_\star\,\amin\,\epsH)}
+\Big\rceil + 1,
+\end{equation}
+so that (C-win) holds by construction; this is the choice
+\eqref{eq:Tchoice} of \Cref{thm:escape-single} with $\gamma = \gamma_\star$
+and $S+\Rstar = \tstar\Rstar$. Using $\log(1+x)\ge x/(1+x)$ for $x \ge 0$,
+\begin{equation}\label{eq:T}
+T \;\le\; \frac{\Phi}{\log(1+\gamma_\star\,\amin\,\epsH)} + 2
+\;\le\; \frac{(1+\gamma_\star\,\amin\,\epsH)\,\Phi}{\gamma_\star\,\amin\,\epsH} + 2
+\;=\; \frac{L_1\,\kappa^2\,\Phi}{\sigma\,\gamma_\star\,\epsH} + \Phi + 2 .
+\tag{T}
+\end{equation}
+% NOTE (flagged corrections to (T)): (1) the denominator is
+% log(1+gamma*alpha_min*epsH), not gamma*alpha*epsH (log(1+x) <= x, so the old
+% T was too small); (2) the growth rate is only guaranteed at the smallest
+% in-window stepsize alpha_min; (3) the old second inequality
+% "(L1+gamma*epsH)Phi/(gamma*epsH)+1" was valid only at alpha = 1/L1 and is
+% superseded.
+
+\paragraph{Per-window decrease.} By \Cref{lem:localization}, the
+localization radius on the no-decrease event is $S = \sqrt{2FT/L_1}$: the
+constant $2/L_1$ is the \emph{uniform} improve-or-localize constant of
+\Cref{lem:improve}, valid for every in-window step under \Cref{ass:pq}
+(restarted steps and non-restarted steps with $\alpha^{\ast}_{\setN}$ are
+the only two iteration types). Equivalently, choosing
+\begin{equation}\label{eq:F}
+F \;:=\; \frac{L_1\,S^2}{2\,T}
+\;=\; \frac{(\tstar-1)^2\,\pi\,L_1\,\epsH^2\,\delta^2}
+{4\,(d+2)\,T\,L_2^2}
+\tag{F}
+\end{equation}
+makes the localization radius exactly $S$.
+% NOTE (flagged correction): the previous version set F = S^2/(2 alpha T),
+% inherited from the GD-style bound sum ||dx||^2 <= 2 alpha (f(x_0)-f(x_T)).
+% The document's own improve-or-localize lemma gives the constant 2/L1 for
+% both iteration types, independently of alpha_k; (F) is now consistent with
+% the definition of S in Lemma \ref{lem:localization}.
+
+\paragraph{Iteration count (window iterations).} Lifetime accounting:
+the number of perturbation windows satisfies
+$\Ntrig \le \LL/F + 1$, hence
+\begin{equation}\label{eq:N}
+\Niter \;\le\; T\,\Ntrig
+\;\le\; \frac{2\,T^2\,\LL}{L_1\,S^2} + T
+\;=\; \frac{4\,(d+2)\,T^2\,L_2^2\,\LL}
+{\pi\,L_1\,(\tstar-1)^2\,\epsH^2\,\delta^2} + T .
+\tag{N}
+\end{equation}
+
+\begin{remark}[Role of the in-window stepsizes]\label{rem:optalpha}
+By \eqref{eq:T}, $T \propto 1/\amin$ to leading order, so \eqref{eq:N}
+scales as $\Niter \propto T^2 \propto \amin^{-2} = (L_1\kappa^2/\sigma)^2$:
+the price of taking genuine NCG steps inside the window, rather than
+gradient steps at $1/L_1$, is the absolute factor $\kappa^4/\sigma^2$.
+Since $(\sigma,\kappa)$ are algorithm constants, this does not affect the
+dependence on $(\epsH, d, \delta)$. Outside the perturbation window the
+stepsize remains a free placeholder, unconstrained by this analysis.
+\end{remark}
+
+\begin{corollary}[Explicit count]\label{cor:explicit}
+Assume additionally $\gamma_\star\,\epsH \le L_1$ (which implies
+$\gamma_\star\,\amin\,\epsH \le \sigma/\kappa^2 \le 1$) and
+$a\,\delta \le \tstar/e$ (so $\Phi \ge 1$). Then
+\[
+T \;\le\; \frac{4\,L_1\,\kappa^2\,\Phi}{\sigma\,\gamma_\star\,\epsH}
+\]
+and
+\begin{equation}\label{eq:Nexplicit}
+\Niter \;\le\;
+\frac{64\,(d+2)\,\kappa^4\,L_1\,L_2^2\,\Phi^2\,\LL}
+{\pi\,\sigma^2\,\gamma_\star^2\,(\tstar-1)^2\,\epsH^4\,\delta^2}
+\;+\; \frac{4\,L_1\,\kappa^2\,\Phi}{\sigma\,\gamma_\star\,\epsH} .
+\end{equation}
+\end{corollary}
+
+\begin{proof}
+By \eqref{eq:T}, $T \le L_1\kappa^2\Phi/(\sigma\gamma_\star\epsH) + \Phi + 2$.
+Since $\Phi \ge 1$, $\Phi + 2 \le 3\Phi$; since
+$\gamma_\star\amin\epsH \le 1$,
+$\Phi \le \Phi/(\gamma_\star\amin\epsH)
+= L_1\kappa^2\Phi/(\sigma\gamma_\star\epsH)$. Hence
+$T \le 4L_1\kappa^2\Phi/(\sigma\gamma_\star\epsH)$. Substituting
+$T^2 \le 16L_1^2\kappa^4\Phi^2/(\sigma^2\gamma_\star^2\epsH^2)$ and
+$S^2 = (\tstar-1)^2\pi\epsH^2\delta^2/\bigl(2(d+2)L_2^2\bigr)$ into
+\eqref{eq:N} gives \eqref{eq:Nexplicit}.
+\end{proof}
+
+\section{Union bound over windows}\label{sec:union}
+
+Each window fails (the perturbation misses the escape direction) with
+probability at most $\delta$. On the event that all of the first
+$\lceil \LL/F\rceil$ windows succeed, the algorithm performs at most
+$\Ntrig \le \LL/F + 1$ windows; by the union bound the failure probability
+is at most $(\LL/F + 1)\,\delta$. Writing $F = c'\,\delta^2$ with
+\begin{equation}\label{eq:cprime}
+c' \;:=\; \frac{\pi\,(\tstar-1)^2\,L_1\,\epsH^2}{4\,(d+2)\,T\,L_2^2}
+\qquad (\text{which depends on } \delta \text{ only through }
+\Phi(\delta) \text{ inside } T),
+\end{equation}
+the requirement of total failure probability at most
+$\Delta \in (0,1)$ reads
+\begin{equation}\label{eq:union}
+\frac{\LL}{c'(\delta)\,\delta} + \delta \;\le\; \Delta .
+\tag{U}
+\end{equation}
+
+\begin{lemma}[Admissible interval for $\delta$]\label{lem:admissible}
+A sufficient condition for \eqref{eq:union} is
+\begin{equation}\label{eq:window}
+\max\Big\{\;\delta_{\mathrm{reg}},\;\;
+\delta_{\mathrm{u}}\;\Big\}
+\;\le\; \delta \;\le\; \frac{\Delta}{2},
+\qquad\text{where}\qquad
+\delta_{\mathrm{u}} \text{ solves } \delta_{\mathrm{u}} =
+\frac{2\,\LL}{c'(\delta_{\mathrm{u}})\,\Delta},
+\end{equation}
+and $\delta_{\mathrm{reg}}$ is the smallest $\delta$ satisfying the regime
+restriction \eqref{eq:Rprime}, namely
+\begin{equation}\label{eq:deltareg}
+\delta_{\mathrm{reg}} \;=\;
+\frac{\tstar\,(2\kappa)^{1/3}\,L_1}
+{a\,\epsH\,\big(B_\star - (2\kappa)^{1/3}\,\thetamin\big)},
+\qquad\text{requiring}\qquad
+B_\star > (2\kappa)^{1/3}\,\thetamin .
+\end{equation}
+The threshold $\delta_{\mathrm{u}}$ exists and is unique: the map
+$\delta \mapsto 2\LL/(c'(\delta)\Delta)$ is strictly decreasing (as
+$\delta$ increases, $\Phi$ decreases, $T$ decreases, $c'$ increases), so it
+crosses the identity exactly once on $(0,1)$.
+The interval \eqref{eq:window} is nonempty if and only if
+$\delta_{\mathrm{reg}} \le \Delta/2$ and
+$\delta_{\mathrm{u}} \le \Delta/2$; the latter is equivalent to
+$c'(\Delta/2)\,\Delta^2 \ge 4\,\LL$.
+\end{lemma}
+
+\begin{proof}
+If $\delta \le \Delta/2$ and $\delta \ge 2\LL/(c'(\delta)\Delta)$, then
+$\LL/(c'\delta) \le \Delta/2$ and \eqref{eq:union} follows by summing.
+Monotonicity of $c'$ in $\delta$: $\Phi(\delta) = \log(\tstar/(a\delta))$
+is strictly decreasing; $T$ in \eqref{eq:Phi} is nondecreasing in $\Phi$;
+$c' \propto 1/T$. The crossing claim follows since the identity map is
+strictly increasing from $0$ and the decreasing map is positive.
+Nonemptiness: $\delta \ge \delta_{\mathrm{u}}$ for $\delta \le \Delta/2$
+is equivalent to $\Delta/2 \ge \delta_{\mathrm{u}}$ by monotonicity, which
+unfolds to $c'(\Delta/2)\,(\Delta/2) \ge 2\LL/\Delta$.
+\end{proof}
+
+\begin{remark}[Choice of $\delta$ within the admissible interval]
+\label{rem:deltachoice}
+The bound \eqref{eq:N} is strictly decreasing in $\delta$ (as
+$1/\delta^2$ up to the logarithm in $T$), so within \eqref{eq:window} the
+iteration bound is minimized at the upper endpoint $\delta = \Delta/2$.
+% TODO (interacts with the open gap): the perturbation's function-value jump
+% f(x_0) - f(snap) is not yet rigorously bounded in the main document; it
+% grows with the perturbation radius R^* \propto \delta. Pinning
+% \delta = \Delta/2 maximizes this exposure; until the jump is bounded and
+% absorbed into the budget accounting, the conservative choice is the lower
+% endpoint of (\ref{eq:window}). The theorem below is stated for an
+% arbitrary admissible \delta for this reason.
+\end{remark}
+
+\begin{remark}[Structural change versus the previous coupling equation]
+\label{rem:coupling}
+Because $F \propto \delta^2$ (not $\delta^4$), the self-consistency
+relation for $\delta$ is the degree-one crossing of
+Lemma~\ref{lem:admissible}, not the previous cubic
+$\delta^3 = 2T(4\kappa)^{2/3}L_1L_2^2\LL/(B^2a^4\epsH^4\Delta)$. That
+equation inherited the exponent $4$ from the infeasible
+$S \propto \delta^2$ and is superseded.
+\end{remark}
+
+\section{Main theorem}\label{sec:main}
+
+\begin{theorem}[PR--NCG escape: corrected exact constants]\label{thm:main}
+Fix tolerances $\epsg, \epsH > 0$ and a global failure probability
+$\Delta \in (0,1)$. Define $a$, $\Rstar$, $\sdel$, $\thetamin$, $\lambda$ by
+\eqref{eq:defs}, \eqref{eq:thetamin}, \eqref{eq:lambda};
+$M = 1-\thetamin$ and $\tstar$ by \eqref{eq:tstar}; the canonical splits by
+\eqref{eq:canonical}; and let $\delta$ be any value in the admissible
+interval \eqref{eq:window}. Assume:
+\begin{enumerate}
+\item \textbf{Tolerance compatibility:} $\thetamin < 1/2$ and
+$B_\star > (2\kappa)^{1/3}\thetamin$;
+\item \textbf{Regime restriction \eqref{eq:Rprime}:}
+$\thetamin + \tstar\lambda \le B_\star/(2\kappa)^{1/3}$
+(equivalently $\delta \ge \delta_{\mathrm{reg}}$ of
+\eqref{eq:deltareg});
+\item \textbf{Union-bound compatibility:} the interval \eqref{eq:window}
+is nonempty;
+\item the escape-window analysis (\Cref{lem:induction},
+\Cref{thm:escape-single}) holds under
+\eqref{eq:Csnap}--\eqref{eq:Cwin}, with $p=q=1$ (\Cref{ass:pq}) and
+in-window stepsizes $\alpha_k \in \{\sigma/(L_1\kappa^2),\, 1/L_1\}$.
+\end{enumerate}
+Set $S = (\tstar-1)\Rstar$, $T$ as in \eqref{eq:Phi}, and
+$F = L_1 S^2/(2T)$. Then with probability at least $1-\Delta$, every
+perturbation window either decreases $f$ by at least $F$ or escapes the
+$\epsH$-saddle, the total number of windows is at most $\LL/F + 1$, and the
+total number of window iterations satisfies the exact bound \eqref{eq:N};
+under the additional assumptions of \Cref{cor:explicit}
+($\gamma_\star\epsH \le L_1$, $a\delta \le \tstar/e$),
+\[
+\Niter \;\le\;
+\frac{64\,(d+2)\,\kappa^4\,L_1\,L_2^2\,\Phi^2\,\LL}
+{\pi\,\sigma^2\,\gamma_\star^2\,(\tstar-1)^2\,\epsH^4\,\delta^2}
+\;+\; \frac{4\,L_1\,\kappa^2\,\Phi}{\sigma\,\gamma_\star\,\epsH},
+\qquad
+\Phi = \log\!\Big(\frac{\tstar}{\delta}\sqrt{\tfrac{2(d+2)}{\pi}}\Big).
+\]
+Moreover the canonical splits are optimal for the surrogate objective
+$J = \gamma\varsigma$ within the exact factor $(1-\rho_\star) \ge 1/2$ of
+Proposition~\ref{prop:nearopt}, hence optimal for the iteration bound
+within an explicit absolute factor (Remark~\ref{rem:surrogate}); and by
+Lemma~\ref{lem:regime-nec} no choice of splits removes the regime
+restriction $\lambda + \thetamin < 1/(2\kappa^{1/3})$, i.e.\
+$\epsH\,\delta > 2\kappa^{1/3}L_1\sqrt{2(d+2)/\pi}$.
+\end{theorem}
+
+\begin{proof}
+Feasibility of the splits and saturation of (C-err), (C-mom) is
+Lemma~\ref{lem:feasible}; (C-win) holds by the definition of $T$ in
+\eqref{eq:Phi}; (C-snap) holds by \eqref{eq:thetamin} and
+$\theta''_\star = \thetamin$. Assumption~4 then yields the per-window
+dichotomy with failure probability at most $\delta$ per window
+(\Cref{thm:escape-single}). The window count and \eqref{eq:N} are the
+lifetime accounting of Section~\ref{sec:derived}; the probability statement
+is Lemma~\ref{lem:admissible}. Near-optimality is
+Proposition~\ref{prop:nearopt} with Remark~\ref{rem:surrogate}, and the
+irremovability of the regime restriction is Lemma~\ref{lem:regime-nec},
+which used only \eqref{eq:budget} and Lemma~\ref{lem:structural}, i.e.\
+holds for \emph{every} feasible choice of splits.
+\end{proof}
+
+\begin{remark}[Scaling summary and comparison]\label{rem:scaling}
+Per window (fixed $\delta$), the corrected count scales as
+$\Niter = \widetilde{O}\!\big(\kappa^4\sigma^{-2}\,L_1 L_2^2\,(d+2)\,\LL\,
+\epsH^{-4}\,\delta^{-2}\big)$, valid only under \eqref{eq:Rprime}; the
+factor $\kappa^4/\sigma^2$ is an absolute constant of the algorithm
+(\Cref{rem:optalpha}). Against Jin--Netrapalli--Jordan ($\epsH^{-4}$,
+polylog $d$, no regime restriction), the remaining gaps are the
+$(d+2)\,\delta^{-2}$ factor and the regime restriction itself; both
+originate in the single-trajectory anti-concentration constant
+$a \propto d^{-1/2}$ and the Fletcher--Reeves envelope $\gup/\glow$ (the
+cubic in Lemma~\ref{lem:Bmom}), respectively, and neither is touched by any
+choice of splits. Removing them is the object of the coupling extension.
+\end{remark}
+
+
+
+
+% \subsection{Step 3c: coupling two trajectories}\label{sub:step3c}
+% Following \cite{pmlr-v70-jin17a}, we track two coupled copies of the algorithm and show
+% their separation grows. Let $v_{\min}$ be a unit minimal eigenvector of
+% $\hess f(\snap)$ and let $\rho > 0$ be a small shift. Start the two copies from
+% \begin{equation}\label{eq:couple-init}
+% x_{0} = \snap + \xi,
+% \qquad
+% x_{0}' = \snap + \xi + \rho\, v_{\min},
+% \end{equation}
+% and define the stacked difference vector
+% \begin{equation}\label{eq:wdef}
+% w_{k} := \begin{pmatrix} x_{k} - x_{k}' \\ d_{k-1} - d_{k-1}' \end{pmatrix}
+%        =: \begin{pmatrix} \Delta x_{k} \\ \Delta d_{k-1} \end{pmatrix},
+% \end{equation}
+% where $\Delta(\cdot)$ denotes the difference of a quantity between the two copies.
+
+% \paragraph{Difference recursion.}
+% From $x_{k+1} = x_{k} + \alpha_{k} d_{k}$ and $x_{k+1}' = x_{k}' + \alpha_{k}' d_{k}'$,
+% splitting $\alpha_{k} d_{k}-\alpha_{k}' d_{k}'
+% = \alpha_{k}(d_{k}-d_{k}') + (\alpha_{k}-\alpha_{k}')d_{k}'$,
+% \begin{equation}\label{eq:dx-rec}
+% \Delta x_{k+1} = \Delta x_{k} + \alpha_{k}\,\Delta d_{k} + \Delta\alpha_{k}\, d_{k}'.
+% \end{equation}
+% Likewise, from $d_{k} = -g_{k} + \beta_{k} d_{k-1}$,
+% \begin{equation}\label{eq:dd-rec}
+% \Delta d_{k} = -\Delta g_{k} + \beta_{k}\,\Delta d_{k-1} + \Delta\beta_{k}\, d_{k-1}'.
+% \end{equation}
+% Linearizing the gradient with \Cref{lem:graderror}, $g_{k} = H(x_{k}-\xstar)+e_{k}$ and
+% $g_{k}' = H(x_{k}'-\xstar)+e_{k}'$,
+% \begin{equation}\label{eq:dg}
+% \Delta g_{k} = H\,\Delta x_{k} + (e_{k} - e_{k}').
+% \end{equation}
+
+% \paragraph{The error difference is Lipschitz.}
+% Let $E(x) := \grad f(x) - H(x-\xstar)$, so $e_{k} = E(x_{k})$, $e_{k}' = E(x_{k}')$. Its
+% Jacobian is $J_{E}(x) = \hess f(x) - H = \hess f(x) - \hess f(\xstar)$. On the ball
+% $\norm{x-\xstar}\leq S$, \Cref{ass:hesslip} gives
+% $\norm{J_{E}(x)} \leq \Ltwo\norm{x-\xstar}\leq \Ltwo S$, so $E$ is $\Ltwo S$-Lipschitz
+% there. Parametrizing the segment $y_{s} = x_{k}' + s(x_{k}-x_{k}')$, $s\in[0,1]$ (which
+% stays in the ball, assumed convex), the FTC yields
+% $E(x_{k})-E(x_{k}') = \int_{0}^{1} J_{E}(y_{s})(x_{k}-x_{k}')\,ds$, hence
+% \begin{equation}\label{eq:ediff}
+% \norm{e_{k} - e_{k}'} \;\leq\; \int_{0}^{1}\norm{J_{E}(y_{s})}\,\norm{\Delta x_{k}}\,ds
+%   \;\leq\; \Ltwo S\,\norm{\Delta x_{k}}.
+% \end{equation}
+
+% \paragraph{Linear map and residual.}
+% Keeping the linear part of \eqref{eq:dx-rec}--\eqref{eq:dg} and collecting the rest into
+% a residual $R_{k}$, and using
+% $\Delta x_{k+1} = (I-\alpha_{k}H)\Delta x_{k} + \alpha_{k}\beta_{k}\,\Delta d_{k-1}$,
+% $\Delta d_{k} = -H\Delta x_{k} + \beta_{k}\Delta d_{k-1}$,
+% \begin{equation}\label{eq:wrec}
+% w_{k+1} = M_{k} w_{k} + R_{k},
+% \qquad
+% M_{k} = \begin{pmatrix} I - \alpha_{k} H & \alpha_{k}\beta_{k} I \\ -H & \beta_{k} I \end{pmatrix}.
+% \end{equation}
+% The map $M_{k}$ has the same eigenvalue structure as in the improve-or-localize
+% analysis. The residual collects the three perturbing terms,
+% \begin{equation}\label{eq:Rdef}
+% R_{k} = (e_{k} - e_{k}') + \Delta\beta_{k}\, d_{k-1}' + \Delta\alpha_{k}\, d_{k}',
+% \end{equation}
+% whose first term satisfies, by \eqref{eq:ediff},
+% $\norm{e_{k}-e_{k}'}\leq \Ltwo S\,\norm{\Delta x_{k}}\leq \Ltwo S\,\norm{w_{k}}$.
+% % NOTE/TODO (open question from the notes): the stepsize-difference term Delta alpha_k.
+% % Idea: set alpha_k = min{1/L1, C ||g_k||^{1+p-2q}} so the worst case (smallest step,
+% % most likely to stay stuck) is selected, which should let us control Delta alpha_k.
+
+% \paragraph{Bounding the $\beta$-difference (Fletcher--Reeves).}
+% With $\beta^{\mathrm{FR}}_{k+1} = \norm{g_{k+1}}^{2}/\norm{g_{k}}^{2}$, splitting the
+% numerator and denominator differences gives
+% \[
+% \Delta\beta_{k+1}
+%   = \frac{\norm{g_{k+1}}^{2} - \norm{g_{k+1}'}^{2}}{\norm{g_{k}}^{2}}
+%     \;-\; \beta_{k+1}'\,\frac{\norm{g_{k}}^{2} - \norm{g_{k}'}^{2}}{\norm{g_{k}}^{2}},
+% \]
+% with $\beta_{k+1}' = \norm{g_{k+1}'}^{2}/\norm{g_{k}'}^{2}$. For the numerators, with
+% $\bar g$ an upper bound on the gradient norms ($\norm{g_{k+1}},\norm{g_{k+1}'}\leq\bar g$),
+% the reverse triangle inequality and \Cref{ass:gradlip} give
+% \[
+% \big|\,\norm{g_{k+1}}^{2}-\norm{g_{k+1}'}^{2}\,\big|
+%   = \big|\norm{g_{k+1}}-\norm{g_{k+1}'}\big|\big(\norm{g_{k+1}}+\norm{g_{k+1}'}\big)
+%   \leq 2\bar g\,\norm{\Delta g_{k+1}} \leq 2\bar g\Lone\,\norm{\Delta x_{k+1}},
+% \]
+% and similarly $|\norm{g_{k}}^{2}-\norm{g_{k}'}^{2}|\leq 2\bar g\Lone\norm{\Delta x_{k}}$.
+% For the denominator, let $\underline g$ satisfy $\norm{g_{k}}^{2}\geq\underline g^{2}$.
+% With $|\beta_{k+1}'|\leq\bar\beta$ and $\norm{\Delta x_{k+1}}\leq\norm{w_{k+1}}$,
+% $\norm{\Delta x_{k}}\leq\norm{w_{k}}$,
+% \begin{equation}\label{eq:dbeta}
+% |\Delta\beta_{k+1}|
+%   \leq \frac{2\bar g\Lone}{\underline g^{2}}
+%        \big(\norm{\Delta x_{k+1}} + |\beta_{k+1}'|\,\norm{\Delta x_{k}}\big)
+%   \leq \frac{2\bar g\Lone}{\underline g^{2}}
+%        \big(\norm{w_{k+1}} + \bar\beta\,\norm{w_{k}}\big).
+% \end{equation}
+% The corresponding residual term then obeys, using
+% $\norm{d_{k}'}\leq\kappa\norm{g_{k}'}^{q}\leq\kappa\bar g^{\,q}$,
+% \begin{equation}\label{eq:dbeta-d}
+% \norm{\Delta\beta_{k+1}\, d_{k}'}
+%   = |\Delta\beta_{k+1}|\,\norm{d_{k}'}
+%   \leq \frac{2\bar g\Lone}{\underline g^{2}}
+%        \big(\norm{w_{k+1}} + \bar\beta\,\norm{w_{k}}\big)\kappa\,\bar g^{\,q}.
+% \end{equation}
+
+% \paragraph{The gradient-norm constants.}
+% While the iterate is stuck in the localization ball, $\norm{x_{k}-\xstar}\leq S$, so by
+% \Cref{ass:gradlip} and $\grad f(\xstar)=0$,
+% \[
+% \norm{g_{k}} = \norm{\grad f(x_{k}) - \grad f(\xstar)} \leq \Lone\norm{x_{k}-\xstar}
+%   \leq \Lone S,
+% \qquad\text{hence}\qquad \bar g = \Lone S .
+% \]
+% For the lower bound $\underline g$: the perturbation is triggered because
+% $\norm{g_{k}}\leq\epsg$, and at the post-perturbation point $g_{0} = \grad f(\snap+\xi)$\dots
+% % TODO: finish the lower bound underline{g}; the notes stop here.
+
+% \begin{remark}[Status of Step 3c]\label{rem:status3c}
+% The coupled recursion \eqref{eq:wrec} and the residual bounds \eqref{eq:ediff} and
+% \eqref{eq:dbeta-d} are in place. What remains: (i) finish the lower bound
+% $\underline g$; (ii) settle the treatment of $\Delta\alpha_{k}$ (see the note after
+% \eqref{eq:Rdef}); (iii) reconcile the $\beta$-index between $R_{k}$
+% (term $\Delta\beta_{k} d_{k-1}'$) and the Fletcher--Reeves computation (done for
+% $\Delta\beta_{k+1}$); and (iv) propagate $w_{k+1} = M_{k}w_{k} + R_{k}$ to show that
+% $\norm{w_{k}}$ grows, then convert this into the high-probability escape and the final
+% complexity bound.
+% \end{remark}
+
+
+
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
