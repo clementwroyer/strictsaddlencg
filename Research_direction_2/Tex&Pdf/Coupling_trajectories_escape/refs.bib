@@ -1,0 +1,157 @@
+
+@InProceedings{pmlr-v70-jin17a,
+  title = 	 {How to Escape Saddle Points Efficiently},
+  author =       {Chi Jin and Rong Ge and Praneeth Netrapalli and Sham M. Kakade and Michael I. Jordan},
+  booktitle = 	 {Proceedings of the 34th International Conference on Machine Learning},
+  pages = 	 {1724--1732},
+  year = 	 {2017},
+  editor = 	 {Precup, Doina and Teh, Yee Whye},
+  volume = 	 {70},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {06--11 Aug},
+  publisher =    {PMLR},
+  pdf = 	 {http://proceedings.mlr.press/v70/jin17a/jin17a.pdf},
+  url = 	 {https://proceedings.mlr.press/v70/jin17a.html},
+  abstract = 	 {This paper shows that a perturbed form of gradient descent converges to a second-order stationary point in a number iterations which depends only poly-logarithmically on dimension (i.e., it is almost “dimension-free”). The convergence rate of this procedure matches the well-known convergence rate of gradient descent to first-order stationary points, up to log factors. When all saddle points are non-degenerate, all second-order stationary points are local minima, and our result thus shows that perturbed gradient descent can escape saddle points almost for free. Our results can be directly applied to many machine learning applications, including deep learning. As a particular concrete example of such an application, we show that our results can be used directly to establish sharp global convergence rates for matrix factorization. Our results rely on a novel characterization of the geometry around saddle points, which may be of independent interest to the non-convex optimization community.}
+}
+
+
+@InProceedings{pmlr-v75-jin18a,
+  title = 	 {Accelerated Gradient Descent Escapes Saddle Points Faster than Gradient Descent},
+  author =       {Jin, Chi and Netrapalli, Praneeth and Jordan, Michael I.},
+  booktitle = 	 {Proceedings of the 31st  Conference On Learning Theory},
+  pages = 	 {1042--1085},
+  year = 	 {2018},
+  editor = 	 {Bubeck, Sébastien and Perchet, Vianney and Rigollet, Philippe},
+  volume = 	 {75},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {06--09 Jul},
+  publisher =    {PMLR},
+  pdf = 	 {http://proceedings.mlr.press/v75/jin18a/jin18a.pdf},
+  url = 	 {https://proceedings.mlr.press/v75/jin18a.html},
+  abstract = 	 {Nesterov’s accelerated gradient descent (AGD), an instance of the general family of “momentum methods,” provably achieves faster convergence rate than gradient descent (GD) in the convex setting. While these methods are widely used in modern \emph{nonconvex} applications, including training of deep neural networks, whether they are provably superior to GD in the nonconvex setting remains open. This paper studies a simple variant of Nesterov’s&nbsp;AGD, and shows that it escapes saddle points and finds a second-order stationary point in $\tilde{O}(1/\epsilon^{7/4})$ iterations, matching the best known convergence rate, which is faster than the $\tilde{O}(1/\epsilon^{2})$ iterations required by GD. To the best of our knowledge, this is the first direct acceleration (single-loop) algorithm that is provably faster than GD in general nonconvex setting—all previous nonconvex accelerated algorithms rely on more complex mechanisms such as nested loops and proximal terms. Our analysis is based on two key ideas: (1) the use of a simple Hamiltonian function, inspired by a continuous-time perspective, which AGD monotonically decreases on each step even for nonconvex functions, and (2) a novel framework called&nbsp;\emph{improve or localize}, which is useful for tracking the long-term behavior of gradient-based optimization algorithms. We believe that these techniques may deepen our understanding of both acceleration algorithms and nonconvex optimization.}
+}
+
+@article{RoyerChan2022,
+title = {A nonlinear conjugate gradient method with complexity guarantees and its application to nonconvex regression},
+journal = {EURO Journal on Computational Optimization},
+volume = {10},
+pages = {100044},
+year = {2022},
+issn = {2192-4406},
+doi = {https://doi.org/10.1016/j.ejco.2022.100044},
+url = {https://www.sciencedirect.com/science/article/pii/S219244062200020X},
+author = {Rémi Chan–Renous-Legoubin and Clément W. Royer},
+abstract = {Nonlinear conjugate gradients are among the most popular techniques for solving continuous optimization problems. Although these schemes have long been studied from a global convergence standpoint, their worst-case complexity properties have yet to be fully understood, especially in the nonconvex setting. In particular, it is unclear whether nonlinear conjugate gradient methods possess better guarantees than first-order methods such as gradient descent. Meanwhile, recent experiments have shown impressive performance of standard nonlinear conjugate gradient techniques on certain nonconvex problems, even when compared with methods endowed with the best known complexity guarantees. In this paper, we propose a nonlinear conjugate gradient scheme based on a simple line-search paradigm and a modified restart condition. These two ingredients allow for monitoring the properties of the search directions, which is instrumental in obtaining complexity guarantees. Our complexity results illustrate the possible discrepancy between nonlinear conjugate gradient methods and classical gradient descent. A numerical investigation on nonconvex robust regression problems as well as a standard benchmark illustrate that the restarting condition can track the behavior of a standard implementation.}
+}
+
+@article{lee2019,
+  title   = {First-order methods almost always avoid strict saddle points},
+  author  = {Lee, Jason D. and Panageas, Ioannis and Piliouras, Georgios and
+             Simchowitz, Max and Jordan, Michael I. and Recht, Benjamin},
+  journal = {Mathematical Programming},
+  volume  = {176},
+  number  = {1--2},
+  pages   = {311--337},
+  year    = {2019}
+}
+
+@article{CarmonYahir,
+author = {Carmon, Yair and Duchi, John C. and Hinder, Oliver and Sidford, Aaron},
+title = {Accelerated Methods for NonConvex Optimization},
+journal = {SIAM Journal on Optimization},
+volume = {28},
+number = {2},
+pages = {1751-1772},
+year = {2018},
+doi = {10.1137/17M1114296},
+
+URL = { 
+    
+        https://doi.org/10.1137/17M1114296
+    
+    
+
+},
+eprint = { 
+    
+        https://doi.org/10.1137/17M1114296
+    
+    
+
+}
+,
+    abstract = { We present an accelerated gradient method for nonconvex optimization problems with Lipschitz continuous first and second derivatives. In a time \$O(\epsilon^{-7/4} \log(1/ \epsilon) )\$, the method finds an \$\epsilon\$-stationary point, meaning a point \$x\$ such that \$\|\nabla f(x)\| \le \epsilon\$. The method improves upon the \$O(\epsilon^{-2} )\$ complexity of gradient descent and provides the additional second-order guarantee that \$\lambda\_{\min}(\nabla^2 f(x)) \gtrsim -\epsilon^{1/2}\$ for the computed \$x\$. Furthermore, our method is Hessian free, i.e., it only requires gradient computations, and is therefore suitable for large-scale applications. }
+}
+
+@article{Fletcher1964FunctionMB,
+  title={Function minimization by conjugate gradients},
+  author={R. Fletcher and C. M. Reeves},
+  journal={Comput. J.},
+  year={1964},
+  volume={7},
+  pages={149-154},
+  url={https://api.semanticscholar.org/CorpusID:62179557}
+}
+
+@inproceedings{Ge2015EscapingFS,
+  title={Escaping From Saddle Points - Online Stochastic Gradient for Tensor Decomposition},
+  author={Rong Ge and Furong Huang and Chi Jin and Yang Yuan},
+  booktitle={Annual Conference Computational Learning Theory},
+  year={2015},
+  url={https://api.semanticscholar.org/CorpusID:11513606}
+}
+
+@article{cubicnewton,
+author = {Nesterov, Yurii and Polyak, Boris},
+year = {2006},
+month = {08},
+pages = {177-205},
+title = {Cubic regularization of Newton method and its global performance},
+volume = {108},
+journal = {Math. Program.},
+doi = {10.1007/s10107-006-0706-8}
+}
+
+@article{POLYAK19641,
+title = {Some methods of speeding up the convergence of iteration methods},
+journal = {USSR Computational Mathematics and Mathematical Physics},
+volume = {4},
+number = {5},
+pages = {1-17},
+year = {1964},
+issn = {0041-5553},
+doi = {https://doi.org/10.1016/0041-5553(64)90137-5},
+url = {https://www.sciencedirect.com/science/article/pii/0041555364901375},
+author = {B.T. Polyak},
+abstract = {For the solution of the functional equation P (x) = 0 (1) (where P is an operator, usually linear, from B into B, and B is a Banach space) iteration methods are generally used. These consist of the construction of a series x0, …, xn, …, which converges to the solution (see, for example [1]). Continuous analogues of these methods are also known, in which a trajectory x(t), 0 ⩽ t ⩽ ∞ is constructed, which satisfies the ordinary differential equation in B and is such that x(t) approaches the solution of (1) as t → ∞ (see [2]). We shall call the method a k-step method if for the construction of each successive iteration xn+1 we use k previous iterations xn, …, xn−k+1. The same term will also be used for continuous methods if x(t) satisfies a differential equation of the k-th order or k-th degree. Iteration methods which are more widely used are one-step (e.g. methods of successive approximations). They are generally simple from the calculation point of view but often converge very slowly. This is confirmed both by the evaluation of the speed of convergence and by calculation in practice (for more details see below). Therefore the question of the rate of convergence is most important. Some multistep methods, which we shall consider further, which are only slightly more complicated than the corresponding one-step methods, make it possible to speed up the convergence substantially. Note that all the methods mentioned below are applicable also to the problem of minimizing the differentiable functional (x) in Hilbert space, so long as this problem reduces to the solution of the equation grad (x) = 0.}
+}
+
+@article{RoyerWright,
+author = {Royer, Cl\'{e}ment W. and Wright, Stephen
+J.},
+title = {Complexity Analysis of Second-Order Line-Search Algorithms for Smooth Nonconvex Optimization},
+journal = {SIAM Journal on Optimization},
+volume = {28},
+number = {2},
+pages = {1448-1477},
+year = {2018},
+doi = {10.1137/17M1134329},
+
+URL = { 
+    
+        https://doi.org/10.1137/17M1134329
+    
+    
+
+},
+eprint = { 
+    
+        https://doi.org/10.1137/17M1134329
+    
+    
+
+}
+,
+    abstract = { There has been much recent interest in finding unconstrained local minima of smooth functions, due in part to the prevalence of such problems in machine learning and robust statistics. A particular focus is algorithms with good complexity guarantees. Second-order Newton-type methods that make use of regularization and trust regions have been analyzed from such a perspective. More recent proposals, based chiefly on first-order methodology, have also been shown to enjoy optimal iteration complexity rates, while providing additional guarantees on computational cost. In this paper, we present an algorithm with favorable complexity properties that differs in two significant ways from other recently proposed methods. First, it is based on line searches only: Each step involves computation of a search direction, followed by a backtracking line search along that direction. Second, its analysis is rather straightforward, relying for the most part on the standard technique for demonstrating sufficient decrease in the objective from backtracking. In the latter part of the paper, we consider inexact computation of the search directions, using iterative methods in linear algebra: the conjugate gradient and Lanczos methods. We derive modified convergence and complexity results for these more practical methods. }
+}

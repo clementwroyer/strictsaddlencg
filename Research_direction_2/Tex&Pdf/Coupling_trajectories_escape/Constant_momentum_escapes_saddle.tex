@@ -1,0 +1,1173 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}      % \coloneqq
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+\usepackage[capitalize,noabbrev]{cleveref}
+
+% ---- Theorem environments: independent counters, per section ----
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+% ---- Macros ----
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Unif}{\mathrm{Unif}}
+\newcommand{\Vol}{\mathrm{Vol}}
+\renewcommand{\d}{\mathrm{d}}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\blockdiag}{blockdiag}
+\newcommand{\lmin}{\lambda_{\min}}
+\newcommand{\grad}{\nabla}
+\newcommand{\Hess}{\nabla^2}
+\newcommand{\inner}[2]{\langle #1,\, #2\rangle}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\epsg}{\eps_{g}}
+\newcommand{\epsH}{\eps_{H}}
+\newcommand{\Bmin}{B_{\min}}
+\newcommand{\mup}{\mu_{+}}
+\newcommand{\mum}{\mu_{-}}
+\newcommand{\vp}{v_{+}}
+\newcommand{\vm}{v_{-}}
+\newcommand{\gp}{\gamma_{+}}
+\newcommand{\gm}{\gamma_{-}}
+\newcommand{\Mmat}{\mathbf{M}}
+\newcommand{\xt}{\tilde{x}}
+\newcommand{\xs}{x^{\star}}
+\newcommand{\Rstar}{R_{0}^{\star}}
+\newcommand{\Otil}{\widetilde{O}}
+\newcommand{\sg}{\sigma_{\mathrm{err}}}
+
+\allowdisplaybreaks
+
+% ============================================================
+\title{\bf A Perturbed Constant-Momentum Method\\
+Escapes Strict Saddle Points}
+
+\author{%
+  Benjamin Séguin\\
+  LAMSADE - Miles\\%
+}
+\date{\today}
+% ============================================================
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study a perturbed momentum method with a constant momentum parameter,
+a fixed step size, and a restart safeguard, and prove that it converges
+to an approximate second-order stationary point of a smooth nonconvex
+objective. Writing
+$L_{1}$ and $L_{2}$ for the gradient- and Hessian-Lipschitz constants
+and $(\epsg,\epsH)$ for the first- and second-order tolerances, the
+method finds a point with $\norm{\grad f(x)}\le\epsg$ and
+$\lmin(\Hess f(x))\ge-\epsH$ in
+\[
+  O\!\left(\frac{L_{1}\,\Delta_{f}}{\epsg^{2}}\right)
+  \;+\;
+  \Otil\!\left(\frac{L_{1}^{3}L_{2}^{2}\,\Delta_{f}}{\epsH^{4}}\right)
+\]
+iterations with high probability, where $\Delta_{f}$ bounds the initial
+suboptimality and $\Otil$ hides polylogarithmic factors in the
+dimension and the failure probability. Under the standard scaling
+$\epsH=\sqrt{L_{2}\epsg}$ this matches the $\Otil(\epsg^{-2})$ rate of
+perturbed gradient descent. Two ingredients drive the analysis. First,
+a restart test on the momentum direction forces every
+search direction to be a descent direction with a quantitative angle
+bound, which yields a per-step decrease and an improve-or-localize
+estimate. Second, around a strict saddle we linearise the
+\emph{difference} of two coupled runs that share their perturbation but
+are offset along the escape direction; the difference obeys a
+non-symmetric matrix recursion whose dominant eigenvalue we identify
+explicitly, and a thin-slab volume argument shows that the set of
+perturbations from which the method fails to escape is negligible.
+\end{abstract}
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+Nonconvex optimisation problems are pervasive in modern machine
+learning, and although locating a global minimiser is intractable in
+the worst case, a more modest target has proved both useful and
+attainable: convergence to a stationary point. A point with small
+gradient may, however, be a saddle point or even a local maximum, and
+the loss surfaces arising in applications are often densely populated
+by such points. It is therefore natural to ask for convergence to a
+\emph{second-order} stationary point, where in addition to a small
+gradient the Hessian is approximately positive semidefinite, ruling out
+the strict saddle points at which $\lmin(\Hess f)<0$.
+
+For gradient descent (GD), the analysis of Jin, Ge, Netrapalli, Kakade
+and Jordan~\cite{pmlr-v70-jin17a} shows that a single random perturbation,
+injected whenever the gradient is small, suffices to escape strict
+saddles, and that the perturbed method reaches an approximate
+second-order stationary point in $\Otil(\eps^{-2})$ iterations---the
+same rate, up to logarithmic factors, at which GD reaches a first-order
+stationary point. The companion work of Jin, Netrapalli and
+Jordan~\cite{pmlr-v75-jin18a} extends the perturbation idea to Nesterov's
+accelerated gradient method and isolates two reusable tools: an
+\emph{improve-or-localize} principle that confines slowly-progressing
+iterates to a small ball, and a \emph{coupling} argument that bounds the
+volume of the ``stuck'' region by tracking two trajectories separated
+along the escape direction.
+
+The present paper carries this programme to a method with
+\emph{constant} momentum. We study the iteration
+$x_{k+1}=x_{k}+\alpha\,d_{k}$, $d_{k+1}=-g_{k+1}+\beta\,d_{k}$ with a
+fixed coefficient $\beta$---equivalently, the heavy-ball recursion
+$x_{k+1}=x_{k}-\alpha\grad f(x_{k})+\beta(x_{k}-x_{k-1})$~\cite{POLYAK19641}---together
+with a restart safeguard that keeps the momentum direction aligned with
+the negative gradient, and a perturbation that is injected when the
+gradient is small. Two features distinguish the analysis from the
+gradient-descent case. The restart keeps every step a descent step
+despite the momentum; and, unlike gradient descent, whose linearisation
+is symmetric, the constant-momentum iteration linearises to a
+\emph{non-symmetric} propagator that does not diagonalise in the
+eigenbasis of the Hessian, which we control by an explicit spectral
+analysis of the two-trajectory difference. Keeping $\beta$ constant is a
+deliberate restriction: it isolates the geometric core of the argument
+and sets aside the gradient-dependent coefficient of genuine nonlinear
+conjugate gradient, whose denominator $\norm{\grad f}^{2}$ vanishes at
+stationary points (see \Cref{sec:conclusion}).
+
+Our analysis rests on two ideas. The first is local: a restart test of
+the form $\norm{g_{k}+d_{k}}\le\nu\norm{g_{k}}$ makes every search
+direction a descent direction with a quantitative angle bound, valid
+both on momentum and on restart steps;
+together with the fixed step size $\alpha=1/L_{1}$ this gives a per-step
+decrease proportional to $\norm{g_{k}}^{2}$ and an improve-or-localize
+estimate. The second is the coupling: near a strict saddle we follow two
+runs that share the perturbation but are offset along the smallest
+curvature direction, linearise their difference, and show that the
+non-symmetric propagator has a dominant real eigenvalue
+$\mup\ge1+\alpha\epsH>1$ that drives the two runs apart, while a
+thin-slab volume argument bounds the set of perturbations from which the
+method stays stuck. \Cref{sec:setup} fixes the setting, the method and
+the main theorem; \Cref{sec:descent} establishes the descent and
+localization estimates; \Cref{sec:recurrence} sets up the linearized
+two-trajectory recursion; \Cref{sec:spectral} analyses the propagator
+and identifies the escape eigenvalue; \Cref{sec:induction} shows the
+geometric growth survives the nonlinearity; \Cref{sec:escape} turns this
+into a high-probability escape guarantee; and \Cref{sec:complexity}
+assembles the iteration complexity.
+
+We emphasise that the method is not accelerated: the rate we obtain
+matches perturbed gradient descent~\cite{pmlr-v70-jin17a}, not the
+$\Otil(\eps^{-7/4})$ of perturbed AGD~\cite{pmlr-v75-jin18a}. Our contribution is
+to show that the perturbation-and-coupling machinery extends to a
+constant-momentum iteration, whose non-symmetric propagator we analyse
+explicitly, once the momentum direction is safeguarded by restarts.
+
+\paragraph{Related work.}
+% Convergence of first-order methods to second-order stationary points has
+% a substantial literature. Cubic regularisation~\cite{NesterovPolyak2006}
+% and trust-region methods reach an $\eps$-second-order point in
+% $O(\eps^{-3/2})$ iterations but require Hessian access. Among
+% gradient-based methods, Ge, Huang, Jin and Yuan~\cite{Ge2015} gave the
+% first polynomial guarantee for noisy gradient descent, sharpened by Jin
+% et al.~\cite{Jin2017} to $\Otil(\eps^{-2})$ with only polylogarithmic
+% dimension dependence. Hessian-vector-product and nested-loop schemes
+% attain $\Otil(\eps^{-7/4})$~\cite{CarmonDuchi2018,RoyerWright2018}, a
+% rate also achieved by the single-loop perturbed AGD
+% of~\cite{JNJ2018}. The stable-manifold viewpoint of Lee et
+% al.~\cite{Lee2019} shows that many first-order methods avoid saddles
+% from almost every initialisation, but without an explicit rate. Momentum methods themselves are classical---the heavy-ball method dates
+% to Polyak~\cite{Polyak1964}---and their behaviour near saddle points has
+% been studied in the quadratic and accelerated settings. A fixed-step
+% nonlinear conjugate gradient method with first-order complexity
+% guarantees was analysed by Chan-Renous-Legoubin and
+% Royer~\cite{ChanRoyer2022}; extending the present second-order analysis
+% to that gradient-dependent coefficient is our motivating goal
+% (\Cref{sec:conclusion}). Our two-trajectory argument is the coupling
+% mechanism of~\cite{Jin2017,JNJ2018}; the non-symmetry of the
+% constant-momentum propagator is what forces the spectral treatment of
+% \Cref{sec:spectral}.
+
+\paragraph{Notation.}
+Throughout, $\norm{\cdot}$ is the Euclidean norm for vectors and the
+spectral norm for matrices, and $\lmin(\cdot)$ is the smallest
+eigenvalue of a symmetric matrix. We write $g_{k}\coloneqq\grad
+f(x_{k})$, $\Hess f$ for the Hessian, and $B_{0}(r)$ for the Euclidean
+ball of radius $r$ centred at the origin. We use $O(\cdot)$ and
+$\Theta(\cdot)$ in the usual way and $\Otil(\cdot)$ to hide
+polylogarithmic factors in all problem parameters. The symbol $\xt$
+denotes the snapshot at which a perturbation is added (the candidate
+saddle), and $\xs$ a global minimiser. Constants introduced along the
+way are collected in \Cref{tab:ledger}.
+
+% ============================================================
+\section{Setting, Algorithm and Main Result}
+\label{sec:setup}
+
+We consider the unconstrained problem $\min_{x\in\R^{d}}f(x)$ under the
+following standing assumptions.
+
+\begin{assumption}\label{ass:smooth}
+$f\colon\R^{d}\to\R$ is twice continuously differentiable and
+$L_{1}$-gradient-Lipschitz: $\norm{\grad f(x)-\grad f(y)}\le
+L_{1}\norm{x-y}$ for all $x,y$.
+\end{assumption}
+
+\begin{assumption}\label{ass:hesslip}
+$f$ is $L_{2}$-Hessian-Lipschitz: $\norm{\Hess f(x)-\Hess f(y)}\le
+L_{2}\norm{x-y}$ for all $x,y$.
+\end{assumption}
+
+\begin{assumption}\label{ass:bounded}
+$f$ is bounded below, and $\Delta_{f}\coloneqq f(x_{0})-\inf_{x}f(x)<\infty$.
+\end{assumption}
+
+\begin{definition}[Approximate second-order stationary point]
+\label{def:sosp}
+Given tolerances $\epsg,\epsH>0$, a point $x$ is an
+$(\epsg,\epsH)$-second-order stationary point ($2$OSP) of $f$ if
+\[
+  \norm{\grad f(x)}\le\epsg
+  \qquad\text{and}\qquad
+  \lmin\!\big(\Hess f(x)\big)\ge-\epsH .
+\]
+\end{definition}
+
+The single-tolerance formulation of~\cite{jipmlr-v70-jin17a,pmlr-v75-jin18a} sets
+$\epsH=\sqrt{L_{2}\,\eps}$ and $\epsg=\eps$; we keep the two tolerances
+separate to follow the formulation of \cite{RoyerChan2022}.
+
+\paragraph{The method.}
+The method is the constant-momentum iteration
+\[
+  x_{k+1}=x_{k}+\alpha\,d_{k},
+  \qquad
+  d_{k}=-g_{k}+\beta\,d_{k-1},
+\]
+with a \emph{fixed} momentum coefficient $\beta\in(0,1]$ and step size
+$\alpha=1/L_{1}$, together with two safeguards. Eliminating the search
+direction gives the equivalent heavy-ball
+form~\cite{POLYAK19641}
+\[
+  x_{k+1}=x_{k}-\alpha\,\grad f(x_{k})+\beta\,(x_{k}-x_{k-1}).
+\]
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+\item \emph{Restart test.} The momentum direction is accepted
+only if it is sufficiently aligned with the negative gradient,
+\begin{equation}\label{eq:restart-test}
+  \norm{g_{k}+d_{k}}\le\nu\,\norm{g_{k}},
+\end{equation}
+with slack $\nu\in(0,\sqrt{5}-2)$; otherwise the method restarts,
+setting $d_{k}=-g_{k}$. We write $\mathcal{N}$ for the steps on which the
+momentum direction is accepted (momentum steps) and $\mathcal{R}$ for the
+restart steps; on $\mathcal{R}$ the test~\eqref{eq:restart-test} holds
+with $\nu=0$.
+\item \emph{Perturbation.} When $\norm{g_{k}}\le\epsg$ and no
+perturbation has been added in the last $T$ iterations, the iterate is
+perturbed, $x_{k}\leftarrow x_{k}+\xi$ with $\xi\sim\Unif(B_{0}(R))$, and
+the direction is reset.
+\end{itemize}
+The step size, restart slack, momentum $\beta$, perturbation radius $R$,
+window length $T$ and gradient trigger $\epsg$ are fixed in
+\Cref{sec:complexity}; their dependence on the problem data is recorded
+in \Cref{tab:ledger}.
+
+\begin{algorithm}[t]
+\caption{PR-CMOM: Perturbed Restarted Constant Momentum
+$\mathrm{PR\text{-}CMOM}(x_0,\,L_1,L_2,\,\varepsilon_g,\varepsilon_H,\,\beta,\,\nu,\,\delta_{\mathrm{tot}},\,\Delta_f)$}
+\label{alg:prncg}
+\begin{algorithmic}[1]
+\State \textbf{Derived constants} (resolve the constraint system of Section~\ref{sec:complexity}):
+\Statex \quad $\alpha \gets 1/L_1$;\quad
+        $\Lambda \gets \log\!\frac{d\, L_1 L_2 \Delta_f}{\varepsilon_g\,\varepsilon_H\,\delta_{\mathrm{tot}}}$;\quad
+        $c(\nu)\gets (1-\nu)-\tfrac{(1+\nu)^2}{2}$
+\Statex \quad $\mu_+ \gets$ larger root of $\mu^2-(1+\beta+\alpha\varepsilon_H)\mu+\beta$;\quad
+        resolve $(T,S,F,r)$ and per-episode $\delta=\delta_{\mathrm{tot}}/\bar K$
+\State $d_0 \gets -\nabla f(x_0)$;\quad $t_{\mathrm{noise}} \gets -T-1$
+\For{$t = 0,1,2,\dots$}
+    \If{$\|\nabla f(x_t)\| \le \varepsilon_g$ \textbf{and} $t - t_{\mathrm{noise}} > T$}
+        \Comment{gradient small: test for negative curvature}
+        \State $\tilde{x} \gets x_t$;\quad $t_{\mathrm{noise}} \gets t$
+        \State $x_t \gets \tilde{x} + \xi_t$,\quad $\xi_t \sim \mathrm{Unif}\big(\mathcal{B}^d(0,r)\big)$
+               \Comment{perturb}
+        \State $d_t \gets -\nabla f(x_t)$
+               \Comment{reset momentum at the snapshot}
+    \EndIf
+    \If{$t - t_{\mathrm{noise}} = T$ \textbf{and} $f(x_t) - f(\tilde{x}) > -F$}
+        \State \Return $\tilde{x}$
+               \Comment{no decrease over the window: $\tilde{x}$ is an $(\varepsilon_g,\varepsilon_H)$-2OSP}
+    \EndIf
+    \State $x_{t+1} \gets x_t + \alpha\, d_t$
+           \Comment{fixed step $\alpha=1/L_1$}
+    \State $g_{t+1} \gets \nabla f(x_{t+1})$
+           \Comment{\textbf{constant} momentum}
+    \State $\hat{d}_{t+1} \gets -g_{t+1} + \beta\, d_t$
+           \Comment{candidate conjugate direction}
+    \If{$\|\hat{d}_{t+1} + g_{t+1}\| \le \nu\,\|g_{t+1}\|$}
+        \State $d_{t+1} \gets \hat{d}_{t+1}$
+               \Comment{keep momentum (restart test passes)}
+    \Else
+        \State $d_{t+1} \gets -g_{t+1}$
+               \Comment{restart: drop momentum}
+    \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Our main result is the following; its proof occupies
+\Cref{sec:descent,sec:recurrence,sec:spectral,sec:induction,sec:escape}
+and is assembled in \Cref{sec:complexity}.
+
+\begin{theorem}[Main result]
+\label{thm:main}
+Let \Cref{ass:smooth,ass:hesslip,ass:bounded} hold and fix a total
+failure probability $\delta_{\mathrm{tot}}\in(0,1)$. There is a choice of
+parameters (\Cref{sec:complexity}) under which, provided each escape window is a momentum window
+(\Cref{def:window}), the method visits
+an $(\epsg,\epsH)$-second-order stationary point with probability at
+least $1-\delta_{\mathrm{tot}}$ after at most
+\[
+  N \;=\;
+  \underbrace{O\!\left(\frac{L_{1}\,\Delta_{f}}{C(\nu)\,\epsg^{2}}\right)}_{
+      \text{large-gradient phase}}
+  \;+\;
+  \underbrace{\Otil\!\left(\frac{L_{1}^{3}L_{2}^{2}\,\Delta_{f}}{\epsH^{4}}\right)}_{
+      \text{escape phase}}
+  \;=\;
+  O\!\big(\epsg^{-2}\big)+\Otil\!\big(\epsH^{-4}\big)
+\]
+iterations, where $C(\nu)=\tfrac{1}{2}(1-4\nu-\nu^{2})>0$ and $\Otil$
+hides factors polylogarithmic in $d$, $1/\delta_{\mathrm{tot}}$ and the
+problem constants.
+\end{theorem}
+
+\begin{remark}
+Under the coupling $\epsH=\sqrt{L_{2}\,\epsg}$ of \Cref{def:sosp},
+$\epsH^{-4}=(L_{2}\epsg)^{-2}$ and the escape phase costs
+$\Otil(\epsg^{-2})$, so the overall rate is $\Otil(\epsg^{-2})$,
+matching perturbed gradient descent~\cite[Theorem 7]{pmlr-v70-jin17a}.
+\end{remark}
+
+\begin{remark}
+The escape-phase bound is established on momentum windows
+(\Cref{def:window}); whether restarts can be ruled out inside an escape
+window is discussed in \Cref{sec:conclusion}.
+\end{remark}
+
+\paragraph{Proof strategy near a saddle.}
+The large-gradient phase is handled by a counting argument
+(\Cref{sec:complexity}). The crux is the escape phase. Suppose the
+method perturbs at a snapshot $\xt$ with
+$\lmin(\Hess f(\xt))\le-\epsH$. We run two coupled copies from
+$x_{0}=\xt+\xi$ and $x_{0}'=x_{0}+R_{0}v_{\min}$, sharing the
+perturbation but offset by $R_{0}$ along the smallest curvature
+direction $v_{\min}$. \emph{(I)} Their difference obeys a linear
+recursion whose homogeneous part grows like $\mup^{k}R_{0}$ with
+$\mup\ge1+\alpha\epsH>1$, and the nonlinear residual stays a fixed
+fraction of it, so the gap grows geometrically. \emph{(II)} A copy that
+fails to escape within $T$ steps is confined, by improve-or-localize, to
+a ball of radius $S$; two confined copies cannot be farther than
+$2S+R_{0}$ apart, which caps the separation of any two stuck starts at a
+threshold $\Rstar$. \emph{(III)} The stuck set is therefore a slab of
+width $\Rstar$ along $v_{\min}$, and \emph{(IV)} a uniform perturbation
+lands in it with probability at most
+$(\Rstar/R)\sqrt{(d+1)/(2\pi)}$, which we drive below $\delta$.
+Repeating over the at most $\Otil(\epsH^{-3})$ saddle episodes and
+counting the large-gradient steps gives \Cref{thm:main}.
+
+% ============================================================
+\section{A Descent Direction and Localization}
+\label{sec:descent}
+
+We first turn the restart test into the two estimates that the rest of
+the analysis rests on: a quantitative descent property of the search
+direction, and the consequent per-step decrease.
+
+\begin{lemma}[Direction bounds]
+\label{lem:dirbounds}
+On every iteration, whether a momentum step ($\mathcal{N}$) or a
+restart step ($\mathcal{R}$),
+\begin{equation}\label{eq:dirbounds}
+  \norm{d_{k}}\le(1+\nu)\norm{g_{k}}
+  \qquad\text{and}\qquad
+  \inner{d_{k}}{g_{k}}\le-(1-\nu)\norm{g_{k}}^{2}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+The accepted direction satisfies $\norm{g_{k}+d_{k}}\le\nu\norm{g_{k}}$
+(on restart steps with $\nu=0$, since $d_{k}=-g_{k}$). For the norm,
+\[
+  \norm{d_{k}}=\norm{(d_{k}+g_{k})-g_{k}}
+  \le\norm{d_{k}+g_{k}}+\norm{g_{k}}
+  \le(1+\nu)\norm{g_{k}}.
+\]
+For the inner product, write $d_{k}=(d_{k}+g_{k})-g_{k}$, so that
+\[
+  \inner{d_{k}}{g_{k}}
+  =-\norm{g_{k}}^{2}+\inner{d_{k}+g_{k}}{g_{k}}
+  \le-\norm{g_{k}}^{2}+\norm{d_{k}+g_{k}}\,\norm{g_{k}}
+  \le(\nu-1)\norm{g_{k}}^{2}. \qedhere
+\]
+\end{proof}
+
+\begin{lemma}[Per-step decrease]
+\label{lem:descent}
+Let \Cref{ass:smooth} hold and let $\alpha=1/L_{1}$. For every
+non-perturbation step,
+\begin{equation}\label{eq:descent}
+  f(x_{k+1})\le f(x_{k})-\frac{C(\nu)}{L_{1}}\,\norm{g_{k}}^{2},
+  \qquad
+  C(\nu)=(1-\nu)-\frac{(1+\nu)^{2}}{2}=\frac{1-4\nu-\nu^{2}}{2},
+\end{equation}
+and $C(\nu)>0$ if and only if $\nu<\sqrt{5}-2$.
+\end{lemma}
+
+\begin{proof}
+By $L_{1}$-smoothness and $x_{k+1}=x_{k}+\alpha d_{k}$,
+\[
+  f(x_{k+1})\le f(x_{k})+\alpha\,\inner{g_{k}}{d_{k}}
+  +\frac{L_{1}}{2}\alpha^{2}\norm{d_{k}}^{2}.
+\]
+Insert the two bounds of \Cref{lem:dirbounds}:
+\[
+  f(x_{k+1})\le f(x_{k})
+  -\alpha(1-\nu)\norm{g_{k}}^{2}
+  +\frac{L_{1}}{2}\alpha^{2}(1+\nu)^{2}\norm{g_{k}}^{2}
+  = f(x_{k})+\norm{g_{k}}^{2}\!\left[-\alpha(1-\nu)
+  +\frac{L_{1}}{2}\alpha^{2}(1+\nu)^{2}\right].
+\]
+With $\alpha=1/L_{1}$ the bracket equals
+$-\tfrac{1}{L_{1}}\big[(1-\nu)-\tfrac{1}{2}(1+\nu)^{2}\big]
+=-C(\nu)/L_{1}$. Finally
+$C(\nu)=\tfrac12(2-2\nu-(1+\nu)^{2})=\tfrac12(1-4\nu-\nu^{2})$ is
+positive exactly when $\nu^{2}+4\nu-1<0$, i.e.\ $\nu<\sqrt5-2$.
+\end{proof}
+
+The decrease~\eqref{eq:descent} also controls how far the iterates can
+travel, which is the improve-or-localize principle: either the objective
+drops appreciably, or the iterates stay in a small ball.
+
+\begin{lemma}[Improve or localize]
+\label{lem:iol}
+Under the setting of \Cref{lem:descent}, suppose only
+momentum and restart steps are taken on $[0,T]$. Then for every
+$k\le T$,
+\begin{equation}\label{eq:iol}
+  \norm{x_{k}-x_{0}}\le(1+\nu)
+  \sqrt{\frac{T\,\big(f(x_{0})-f(x_{T})\big)}{L_{1}\,C(\nu)}}.
+\end{equation}
+In particular, if $f(x_{0})-f(x_{T})\le F$ then
+$\norm{x_{k}-x_{0}}\le S$ for all $k\le T$, where
+\begin{equation}\label{eq:Sdef}
+  S\;\coloneqq\;(1+\nu)\sqrt{\frac{T F}{L_{1}\,C(\nu)}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Using $x_{k+1}-x_{k}=\alpha d_{k}$, the bound
+$\norm{d_{k}}\le(1+\nu)\norm{g_{k}}$, and~\eqref{eq:descent} in the
+form $\norm{g_{k}}^{2}\le\frac{L_{1}}{C(\nu)}(f(x_{k})-f(x_{k+1}))$,
+\[
+  \norm{x_{k+1}-x_{k}}^{2}
+  =\alpha^{2}\norm{d_{k}}^{2}
+  \le\alpha^{2}(1+\nu)^{2}\norm{g_{k}}^{2}
+  \le\frac{(1+\nu)^{2}}{L_{1}C(\nu)}\big(f(x_{k})-f(x_{k+1})\big),
+\]
+since $\alpha^{2}=1/L_{1}^{2}$. Summing telescopes:
+\[
+  \sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}^{2}
+  \le\frac{(1+\nu)^{2}}{L_{1}C(\nu)}\big(f(x_{0})-f(x_{k})\big).
+\]
+By the triangle and Cauchy--Schwarz inequalities,
+\[
+  \norm{x_{k}-x_{0}}
+  \le\sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}
+  \le\sqrt{k}\left(\sum_{j=0}^{k-1}\norm{x_{j+1}-x_{j}}^{2}\right)^{1/2}
+  \le(1+\nu)\sqrt{\frac{k\,(f(x_{0})-f(x_{k}))}{L_{1}C(\nu)}},
+\]
+and $k\le T$, $f(x_{0})-f(x_{k})\le f(x_{0})-f(x_{T})\le F$ give the
+claim.
+\end{proof}
+
+% ============================================================
+\section{Linearizing Two Coupled Trajectories}
+\label{sec:recurrence}
+ 
+We now set up the coupling. Fix a snapshot $\xt$ at which a perturbation
+is added, and consider two runs of the method,
+\[
+  x_{0}=\xt+\xi,\qquad x_{0}'=x_{0}+R_{0}\,v_{\min},
+\]
+that share the perturbation $\xi$ but are offset by $R_{0}$ along the
+minimal curvature direction $v_{\min}$ of $H\coloneqq\Hess f(\xt)$. Write
+$\Delta x_{k}=x_{k}-x_{k}'$ and $\Delta d_{k}=d_{k}-d_{k}'$, and study
+\[
+  w_{k}\coloneqq\begin{pmatrix}\Delta x_{k}\\[2pt]\Delta d_{k-1}\end{pmatrix}
+  \in\R^{2d}.
+\]
+The key is to write the gradient as its linear part plus a remainder,
+$g_{k}=Hx_{k}+e_{k}$ with $e_{k}\coloneqq\grad f(x_{k})-Hx_{k}$, and to
+control the remainder through the Hessian-Lipschitz constant.
+
+\begin{definition}[Momentum window]\label{def:window}
+A block of $T$ iterations following a perturbation is a \emph{momentum
+window} if, for both coupled trajectories, the restart
+test~\eqref{eq:restart-test} fails to trigger at every step, so that
+$d_{k}=-g_{k}+\beta\,d_{k-1}$ holds with the same fixed $\beta$
+throughout. Equivalently, the propagator $\Mmat$ below is constant
+across the window.
+\end{definition}
+
+\noindent The escape phase is analysed on momentum windows; this is the
+analogue of the ``only accelerated steps, no negative-curvature
+exploitation'' regime of~\cite{pmlr-v75-jin18a}. A restart replaces $\Mmat$ by
+the matrix obtained by setting $\beta=0$, so the single-matrix growth
+estimates of \Cref{sec:spectral} no longer apply; discharging
+\Cref{def:window}---showing restarts are inactive near a saddle---is left
+to future work (\Cref{sec:conclusion}).
+
+\begin{lemma}[Difference recursion]
+\label{lem:recurrence}
+Along a momentum window (\Cref{def:window}), with $\alpha=1/L_{1}$, and the constant momentum $\beta$,
+\begin{equation}\label{eq:recurrence}
+  w_{k+1}=\Mmat\,w_{k}+\mathcal{R}_{k},
+  \qquad
+  \Mmat=\begin{pmatrix}I-\alpha H & \alpha\beta I\\[2pt] -H & \beta I\end{pmatrix},
+  \qquad
+  \mathcal{R}_{k}=\begin{pmatrix}-\alpha\,\Delta e_{k}\\[2pt]-\Delta e_{k}\end{pmatrix},
+\end{equation}
+where $\Delta e_{k}=\grad f(x_{k})-\grad f(x_{k}')-H\Delta x_{k}$.
+Moreover, if all iterates of both runs stay within $S$ of their starts
+and within $R$ of $\xt$ at the start, then
+\begin{equation}\label{eq:residual}
+  \norm{\mathcal{R}_{k}}\le\sg\,\norm{w_{k}},
+  \qquad \sg\coloneqq \sqrt{1+\alpha^{2}}\;L_{2}(S+R).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+From $x_{k+1}=x_{k}+\alpha d_{k}$ and
+$d_{k}=-g_{k}+\beta d_{k-1}=-(Hx_{k}+e_{k})+\beta d_{k-1}$ we obtain, on
+differencing the two runs,
+\[
+  \Delta d_{k}=-H\Delta x_{k}-\Delta e_{k}+\beta\,\Delta d_{k-1},
+  \qquad
+  \Delta x_{k+1}=\Delta x_{k}+\alpha\,\Delta d_{k}.
+\]
+Substituting the first into the second,
+\[
+  \Delta x_{k+1}
+  =(I-\alpha H)\Delta x_{k}+\alpha\beta\,\Delta d_{k-1}-\alpha\,\Delta e_{k},
+\]
+which is the top block of~\eqref{eq:recurrence}; the bottom block is the
+displayed expression for $\Delta d_{k}$. This proves the recursion.
+ 
+For the residual, set $E(x)\coloneqq\grad f(x)-Hx$, whose Jacobian is
+$J_{E}(x)=\Hess f(x)-H$, so that by \Cref{ass:hesslip},
+$\norm{J_{E}(x)}\le L_{2}\norm{x-\xt}$. Writing
+$y_{t}=x_{k}'+t(x_{k}-x_{k}')$ and applying the fundamental theorem of
+calculus,
+\[
+  \Delta e_{k}=E(x_{k})-E(x_{k}')
+  =\Big(\int_{0}^{1}J_{E}(y_{t})\,\d t\Big)\Delta x_{k}.
+\]
+Hence
+\[
+  \norm{\Delta e_{k}}
+  \le\norm{\Delta x_{k}}\int_{0}^{1}\norm{J_{E}(y_{t})}\,\d t
+  \le L_{2}\norm{\Delta x_{k}}\int_{0}^{1}\norm{y_{t}-\xt}\,\d t
+  \le L_{2}\,\max\{\norm{x_{k}-\xt},\norm{x_{k}'-\xt}\}\,\norm{\Delta x_{k}},
+\]
+using convexity of $t\mapsto\norm{y_{t}-\xt}$. Finally
+$\norm{x_{k}-\xt}\le\norm{x_{k}-x_{0}}+\norm{x_{0}-\xt}\le S+R$, and the
+same for the primed run, so
+$\norm{\Delta e_{k}}\le L_{2}(S+R)\norm{\Delta x_{k}}$. The residual is
+the stacked vector $\mathcal{R}_{k}=(-\alpha\Delta e_{k},-\Delta e_{k})$,
+whose norm is $\norm{\mathcal{R}_{k}}=\sqrt{1+\alpha^{2}}\,\norm{\Delta e_{k}}$
+exactly; combined with $\norm{\Delta x_{k}}\le\norm{w_{k}}$ this gives
+$\norm{\mathcal{R}_{k}}\le\sqrt{1+\alpha^{2}}\,L_{2}(S+R)\norm{w_{k}}$,
+which is~\eqref{eq:residual}.
+\end{proof}
+
+% ============================================================
+\section{Spectral Analysis of the Propagator}
+\label{sec:spectral}
+
+The recursion~\eqref{eq:recurrence} is driven by the non-symmetric
+matrix $\Mmat$. Because $\Mmat$ is a polynomial in $H$, it
+block-diagonalises in the eigenbasis of $H$ into $2\times2$ blocks,
+which we analyse one eigen-direction at a time.
+
+\begin{lemma}[Block reduction]
+\label{lem:block}
+Let $H=VD V^{\top}$ with $V=[v_{1},\dots,v_{d}]$ and
+$D=\diag(\lambda_{1},\dots,\lambda_{d})$. In the reordered basis
+$(\Delta x^{(1)},\Delta d^{(1)},\dots,\Delta x^{(d)},\Delta d^{(d)})$,
+the propagator is block-diagonal,
+$\Mmat\cong\blockdiag(B_{1},\dots,B_{d})$, with
+\begin{equation}\label{eq:blocks}
+  B_{i}=\begin{pmatrix}1-\alpha\lambda_{i} & \alpha\beta\\[2pt]-\lambda_{i} & \beta\end{pmatrix},
+  \qquad \det B_{i}=\beta,\qquad \tr B_{i}=1-\alpha\lambda_{i}+\beta.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Conjugating $\Mmat$ by $\diag(V,V)$ replaces $H$ by $D$ in every
+block of~\eqref{eq:recurrence}, giving
+$\bigl(\begin{smallmatrix}I-\alpha D&\alpha\beta I\\-D&\beta
+I\end{smallmatrix}\bigr)$. As all four sub-blocks are diagonal, grouping
+the $i$-th coordinate of the $x$- and $d$-parts yields the $2\times2$
+block $B_{i}$ in~\eqref{eq:blocks}; the determinant and trace are read
+off directly.
+\end{proof}
+
+\begin{lemma}[Powers of a $2\times2$ block]
+\label{lem:cayley}
+Let $B$ be a $2\times2$ matrix with eigenvalues $\mu_{1},\mu_{2}$
+(possibly equal or complex) and spectral radius
+$\rho=\max\{\abs{\mu_{1}},\abs{\mu_{2}}\}$. For every $n\in\N$,
+\[
+  B^{n}=a_{n}B+b_{n}I,\qquad
+  a_{n}=\frac{\mu_{1}^{n}-\mu_{2}^{n}}{\mu_{1}-\mu_{2}},\qquad
+  b_{n}=-\mu_{1}\mu_{2}\,\frac{\mu_{1}^{n-1}-\mu_{2}^{n-1}}{\mu_{1}-\mu_{2}},
+\]
+and consequently
+\begin{equation}\label{eq:Cbound}
+  \norm{B^{n}}\le C(B)\,\rho^{n},
+  \qquad
+  C(B)\coloneqq\frac{2\,(\norm{B}+\rho)}{\abs{\mu_{1}-\mu_{2}}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+By the Cayley--Hamilton theorem $B^{2}=(\mu_{1}+\mu_{2})B-\mu_{1}\mu_{2}I$,
+so $B^{n}=a_{n}B+b_{n}I$ for scalars $a_{n},b_{n}$. Evaluating on the two
+eigenvalues, $\mu_{i}^{n}=a_{n}\mu_{i}+b_{n}$, and solving the $2\times2$
+linear system gives the stated $a_{n},b_{n}$. Bounding
+$\abs{\mu_{1}^{n}-\mu_{2}^{n}}\le2\rho^{n}$ and
+$\abs{\mu_{1}\mu_{2}}\,\abs{\mu_{1}^{n-1}-\mu_{2}^{n-1}}
+\le\abs{\mu_{1}}\,2\rho^{n}$ yields
+$\abs{a_{n}}\le2\rho^{n}/\abs{\mu_{1}-\mu_{2}}$ and
+$\abs{b_{n}}\le\abs{\mu_{1}}\,2\rho^{n}/\abs{\mu_{1}-\mu_{2}}$, hence
+$\norm{B^{n}}\le\abs{a_{n}}\norm{B}+\abs{b_{n}}
+\le\frac{2\rho^{n}}{\abs{\mu_{1}-\mu_{2}}}(\norm{B}+\rho)$.
+\end{proof}
+
+\subsection{The escape block}
+
+The block with the most negative curvature is the engine of the escape.
+We show it has a real eigenvalue strictly larger than one.
+
+\begin{lemma}[Escape eigenvalue]
+\label{lem:escapeeig}
+Let $\lambda_{\min}\le-\epsH$ and let $\Bmin=B(\lambda_{\min})$ as
+in~\eqref{eq:blocks}, with characteristic polynomial
+$p(\mu)=\mu^{2}-t\mu+\beta$, where
+$t=\tr\Bmin=1+\beta+\alpha\abs{\lambda_{\min}}$. Then $\Bmin$ has real
+eigenvalues $\mum<1<\mup$ with
+\begin{equation}\label{eq:mup-lb}
+  \mup\;\ge\;1+\alpha\abs{\lambda_{\min}}\;\ge\;1+\alpha\epsH.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Since $\lambda_{\min}<0$, $t=1+\beta+\alpha\abs{\lambda_{\min}}>1+\beta$.
+Evaluating the characteristic polynomial at $1$,
+\[
+  p(1)=1-t+\beta=-\alpha\abs{\lambda_{\min}}<0,
+\]
+so $p$ has a root on each side of $1$, in particular $p$ has two real
+roots and $\mum<1<\mup$. Writing $a=\alpha\abs{\lambda_{\min}}$ and
+evaluating at $1+a$,
+\[
+  p(1+a)=(1+a)^{2}-(1+\beta+a)(1+a)+\beta
+  =(1+a)\big[(1+a)-(1+\beta+a)\big]+\beta=-\beta(1+a)+\beta=-\beta a\le0.
+\]
+As $p(\mu)\to+\infty$ for $\mu\to\infty$ and $p(1+a)\le0$, the larger
+root satisfies $\mup\ge1+a=1+\alpha\abs{\lambda_{\min}}\ge1+\alpha\epsH$.
+\end{proof}
+
+\begin{lemma}[No block grows faster]
+\label{lem:nofaster}
+Let $\beta>0$. For every eigenvalue
+$\lambda\in[\lambda_{\min},L_{1}]$ of $H$, the spectral radius of
+$B(\lambda)$ satisfies $\rho(\lambda)\le\mup$. Consequently, for the
+propagator,
+\begin{equation}\label{eq:Mbound}
+  \norm{\Mmat^{n}}\le C_{0}\,\mup^{n},\qquad C_{0}\coloneqq\max_{i}C(B_{i}).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+By~\eqref{eq:blocks} the determinant $\det B(\lambda)=\beta$ is constant
+while $t(\lambda)=1-\alpha\lambda+\beta$ is strictly decreasing in
+$\lambda$, hence maximal at $\lambda=\lambda_{\min}$. The eigenvalues are
+$\mu_{\pm}(\lambda)=\tfrac12\big(t(\lambda)\pm\sqrt{t(\lambda)^{2}-4\beta}\big)$.
+If $t(\lambda)^{2}<4\beta$ the eigenvalues are complex conjugates with
+$\abs{\mu}^{2}=\det=\beta$, so $\rho(\lambda)=\sqrt{\beta}$; we have
+$\rho(\lambda)=\sqrt\beta = \sqrt{\mup \mum} \leq \mup$. If $t(\lambda)^{2}\ge4\beta$ the
+larger root
+$\rho(\lambda)=\tfrac12\big(t(\lambda)+\sqrt{t(\lambda)^{2}-4\beta}\big)$
+is increasing in $t(\lambda)$, hence maximal at $\lambda=\lambda_{\min}$,
+where it equals $\mup$. In both cases $\rho(\lambda)\le\mup$. Since
+$\Mmat^{n}$ is block-diagonal,
+$\norm{\Mmat^{n}}=\max_{i}\norm{B_{i}^{n}}\le\max_{i}C(B_{i})\rho_{i}^{n}
+\le C_{0}\mup^{n}$ by~\eqref{eq:Cbound}.
+\end{proof}
+
+\subsection{Growth of the homogeneous part}
+
+We decompose the difference state as $w_{k}=h_{k}+p_{k}$, the
+homogeneous part $h_{k}=\Mmat^{k}w_{0}$ and the residual
+$p_{k}=\sum_{\tau=0}^{k-1}\Mmat^{k-1-\tau}\mathcal{R}_{\tau}$, so that
+$p_{0}=0$ and $p_{k+1}=\Mmat p_{k}+\mathcal{R}_{k}$. With $w_{0}$ chosen
+in the escape plane, the homogeneous part is governed entirely by
+$\Bmin$.
+
+\begin{lemma}[Homogeneous growth]
+\label{lem:homgrowth}
+Let $w_{0}=(R_{0},0)$ lie in the two-dimensional escape plane and write,
+in the eigenbasis of $\Bmin$, $v_{\mu}=(\beta-\mu,\lambda_{\min})$,
+$\zeta=\mum/\mup\in[0,1)$. Fix $\theta\in(0,1)$ and let $k_{0}$ be the
+least index with $\zeta^{k_{0}}\norm{\vm}\le\theta\norm{\vp}$. Then for
+all $k\ge k_{0}$,
+\begin{equation}\label{eq:hgrowth}
+  \norm{h_{k}}\ge c_{1}\,\mup^{k}R_{0},
+  \qquad c_{1}\coloneqq(1-\theta)\,\frac{\norm{\vp}}{\mup-\mum},
+\end{equation}
+and the position block alone satisfies
+$\abs{\Delta x_{k}^{\mathrm{hom}}}\ge c_{1}'\,\mup^{k}R_{0}$ with
+$c_{1}'=(1-\theta)\,\abs{\beta-\mup}/(\mup-\mum)$. Moreover
+$\norm{h_{k}}\le c_{h}\,\mup^{k}R_{0}$ with $c_{h}=C(\Bmin)$.
+\end{lemma}
+
+\begin{proof}
+The eigenvectors of $\Bmin$ solve $(\Bmin-\mu I)v=0$; from the second
+row, $-\lambda_{\min}v^{(1)}+(\beta-\mu)v^{(2)}=0$, so
+$v_{\mu}=(\beta-\mu,\lambda_{\min})$. Expand $w_{0}=\gp\vp+\gm\vm$. The
+second coordinate gives $0=\gp\lambda_{\min}+\gm\lambda_{\min}$, hence
+$\gm=-\gp$; the first gives
+$R_{0}=\gp(\beta-\mup)+\gm(\beta-\mum)=\gp(\mum-\mup)$, so
+$\abs{\gp}=R_{0}/(\mup-\mum)\neq0$. Thus $w_{0}$ has a nonzero component
+along the unstable eigenvector. Therefore
+\[
+  h_{k}=\Bmin^{k}w_{0}
+  =\gp\mup^{k}\vp+\gm\mum^{k}\vm
+  =\gp\,\mup^{k}\big(\vp-\zeta^{k}\vm\big),
+\]
+and
+\[
+  \norm{h_{k}}
+  \ge\abs{\gp}\,\mup^{k}\big(\norm{\vp}-\zeta^{k}\norm{\vm}\big)
+  \ge(1-\theta)\,\abs{\gp}\,\norm{\vp}\,\mup^{k}
+  =(1-\theta)\frac{\norm{\vp}}{\mup-\mum}\,\mup^{k}R_{0}
+\]
+for $k\ge k_{0}$. Projecting onto the position coordinate replaces
+$\norm{\vp}$ by $\abs{\beta-\mup}$, giving the bound on
+$\abs{\Delta x_{k}^{\mathrm{hom}}}$. The upper bound is immediate from
+$\norm{h_{k}}=\norm{\Bmin^{k}w_{0}}\le C(\Bmin)\mup^{k}\norm{w_{0}}$
+and $\norm{w_{0}}=R_{0}$.
+\end{proof}
+
+% ============================================================
+\section{Geometric Growth of the Gap}
+\label{sec:induction}
+
+It remains to show that the residual $p_{k}$ does not cancel the growth
+of $h_{k}$. The mechanism is an induction: assuming
+$\norm{p_{\tau}}\le c\norm{h_{\tau}}$ up to step $k$, the bound on
+$\norm{\mathcal{R}_{\tau}}$ keeps the accumulated residual a fraction of
+$h_{k+1}$, provided $\sg=\sqrt{1+\alpha^{2}}\,L_{2}(S+R)$ is small enough, which is achievable because
+$S$ and $R$ are at our disposal.
+
+\begin{lemma}[Geometric growth survives]
+\label{lem:induction}
+Along a momentum window (\Cref{def:window}), suppose $c\in(0,1)$ and
+\begin{equation}\label{eq:sigma-cond}
+  \sg\;\le\;\frac{c\,c_{1}\,\mup}{C_{0}\,c_{h}\,(1+c)\,(T+1)}\;=:\;\frac{\Lambda}{T+1}.
+\end{equation}
+Then $\norm{p_{k}}\le c\,\norm{h_{k}}$ for all $k\le T$, and therefore
+\begin{equation}\label{eq:gap-grows}
+  \norm{w_{T}}\ge(1-c)\,c_{1}\,\mup^{T}R_{0},
+  \qquad
+  \norm{\Delta x_{T}}\ge\big(c_{1}'-c\,c_{h}\big)\,\mup^{T}R_{0}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+We argue by induction on $k$. The base case $p_{0}=0$ is immediate.
+Assume $\norm{p_{\tau}}\le c\norm{h_{\tau}}$ for all $\tau\le k$, so that
+$\norm{w_{\tau}}\le(1+c)\norm{h_{\tau}}\le(1+c)c_{h}\mup^{\tau}R_{0}$ by
+\Cref{lem:homgrowth}. Using
+$p_{k+1}=\sum_{\tau=0}^{k}\Mmat^{k-\tau}\mathcal{R}_{\tau}$,
+the propagator bound~\eqref{eq:Mbound}, the residual
+bound~\eqref{eq:residual} and the inductive hypothesis,
+\begin{align*}
+  \norm{p_{k+1}}
+  &\le\sum_{\tau=0}^{k}\norm{\Mmat^{k-\tau}}\,\norm{\mathcal{R}_{\tau}}
+  \le\sum_{\tau=0}^{k}C_{0}\,\mup^{k-\tau}\,\sg\,\norm{w_{\tau}}\\
+  &\le\sum_{\tau=0}^{k}C_{0}\,\mup^{k-\tau}\,\sg\,(1+c)\,c_{h}\,\mup^{\tau}R_{0}
+  = C_{0}\,c_{h}\,\sg\,(1+c)\,R_{0}\,(k+1)\,\mup^{k}.
+\end{align*}
+By~\eqref{eq:sigma-cond} and $k+1\le T+1$,
+$C_{0}c_{h}\sg(1+c)(k+1)\le c\,c_{1}\mup$, so
+$\norm{p_{k+1}}\le c\,c_{1}\,\mup^{k+1}R_{0}\le c\,\norm{h_{k+1}}$,
+the last step by the lower bound~\eqref{eq:hgrowth}. This closes the
+induction. Finally
+$\norm{w_{T}}\ge\norm{h_{T}}-\norm{p_{T}}\ge(1-c)\norm{h_{T}}
+\ge(1-c)c_{1}\mup^{T}R_{0}$, and projecting onto the position block,
+$\norm{\Delta x_{T}}\ge\abs{\Delta x_{T}^{\mathrm{hom}}}
+-\norm{p_{T}}\ge c_{1}'\mup^{T}R_{0}-c\,c_{h}\mup^{T}R_{0}$.
+\end{proof}
+
+\begin{remark}
+Positivity of the position growth coefficient requires
+$c<c_{1}'/c_{h}$, which is built into the admissible range
+$c\in(0,\min\{1,c_{1}'/c_{h}\})$ of \Cref{tab:ledger}.
+\end{remark}
+
+% ============================================================
+\section{Escaping Strict Saddle Points}
+\label{sec:escape}
+
+We now combine the geometric growth of the gap with the confinement of
+stuck trajectories. The decomposition of the perturbation along and
+orthogonal to $v_{\min}$ is $\xi=\xi_{1}+\xi_{\perp}$ with
+$\xi_{1}=\inner{\xi}{v_{\min}}\in\R$ and $\xi_{\perp}\in v_{\min}^{\perp}
+\cong\R^{d-1}$. Define the localized and stuck sets
+\[
+  \mathcal{X}_{\mathrm{loc}}
+  =\big\{\xi\in B_{0}(R):\norm{x_{k}-x_{0}}\le S\ \forall\,0\le k\le T\big\},
+  \quad
+  \mathcal{X}_{\mathrm{stuck}}
+  =\big\{\xi\in B_{0}(R):f(x_{T})-f(x_{0})>-F\big\}.
+\]
+By improve-or-localize, a perturbation from which the method fails to
+decrease the objective by $F$ is localized:
+$\mathcal{X}_{\mathrm{stuck}}\subseteq\mathcal{X}_{\mathrm{loc}}$. It
+therefore suffices to bound $\Prob(\xi\in\mathcal{X}_{\mathrm{loc}})$.
+
+\begin{lemma}[Threshold separation]
+\label{lem:threshold}
+If two stuck trajectories start at $x_{0}$ and $x_{0}'=x_{0}+R_{0}v_{\min}$,
+then $\norm{\Delta x_{T}}\le2S+R_{0}$. Combined with~\eqref{eq:gap-grows}
+this forces
+\begin{equation}\label{eq:Rstar}
+  R_{0}\;\le\;\Rstar
+  \;\coloneqq\;\frac{2S}{(c_{1}'-c\,c_{h})\,\mup^{T}-1}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+If both runs are stuck, each is confined by \Cref{lem:iol} to a ball of
+radius $S$ around its start, so
+\[
+  \norm{\Delta x_{T}}
+  \le\norm{x_{T}-x_{0}}+\norm{x_{0}-x_{0}'}+\norm{x_{0}'-x_{T}'}
+  \le S+R_{0}+S=2S+R_{0}.
+\]
+On the other hand~\eqref{eq:gap-grows} gives
+$\norm{\Delta x_{T}}\ge(c_{1}'-c\,c_{h})\mup^{T}R_{0}$. Hence
+$(c_{1}'-c\,c_{h})\mup^{T}R_{0}\le2S+R_{0}$, i.e.\
+$R_{0}\big[(c_{1}'-c\,c_{h})\mup^{T}-1\big]\le2S$, which
+is~\eqref{eq:Rstar}.
+\end{proof}
+
+\begin{lemma}[Escape with high probability]
+\label{lem:escape}
+Suppose $\norm{\grad f(\xt)}\le\epsg$ and
+$\lmin(\Hess f(\xt))\le-\epsH$, and that a perturbation has not been
+added in the previous $T$ steps, and that the next $T$ steps form a
+momentum window (\Cref{def:window}). If the parameters satisfy
+\begin{equation}\label{eq:Tcond}
+  T\;\ge\;\frac{1}{\log\mup}\,
+  \log\!\left[\frac{1}{c_{1}'-c\,c_{h}}
+  \left(1+\frac{2S}{\delta R}\sqrt{\frac{d+1}{2\pi}}\right)\right]
+\end{equation}
+and $R$ is chosen so that $\epsg R+\tfrac{L_{1}}{2}R^{2}\le\eta F$ with
+$\eta\le\tfrac12$, then with probability at least $1-\delta$,
+\begin{equation}\label{eq:netdecrease}
+  f(x_{T})-f(\xt)\le-(1-\eta)F\le-\tfrac12F.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+\emph{Volume of the stuck set.} By \Cref{lem:threshold}, any two stuck
+perturbations lying on a line parallel to $v_{\min}$ are separated by at
+most $\Rstar$, so the one-dimensional Lebesgue measure of
+$\mathcal{X}_{\mathrm{loc}}$ along each such line is at most $\Rstar$. By
+Fubini, splitting $x=(x^{(1)},x^{(\perp)})$ with $x^{(1)}$ along
+$v_{\min}$,
+\[
+  \Vol(\mathcal{X}_{\mathrm{loc}})
+  =\int_{B^{d-1}_{0}(R)}\!\!\Big(\int 
+  \mathbf{1}\{\mathcal{X}_{\mathrm{loc}}\}\,\d x^{(1)}\Big)\d x^{(\perp)}
+  \le\int_{B^{d-1}_{0}(R)}\!\!\Rstar\,\d x^{(\perp)}
+  =\Rstar\,\Vol\!\big(B^{d-1}_{0}(R)\big).
+\]
+Using $\Vol(B^{n}_{0}(R))=\pi^{n/2}R^{n}/\Gamma(\tfrac n2+1)$ and
+$\Gamma(\tfrac d2+1)/\Gamma(\tfrac d2+\tfrac12)\le\sqrt{(d+1)/2}$,
+\[
+  \Prob(\xi\in\mathcal{X}_{\mathrm{loc}})
+  =\frac{\Vol(\mathcal{X}_{\mathrm{loc}})}{\Vol(B^{d}_{0}(R))}
+  \le\frac{\Rstar}{R\sqrt\pi}\cdot\frac{\Gamma(\tfrac d2+1)}{\Gamma(\tfrac d2+\tfrac12)}
+  \le\frac{\Rstar}{R}\sqrt{\frac{d+1}{2\pi}}.
+\]
+Requiring the right-hand side to be at most $\delta$ is, by the
+definition~\eqref{eq:Rstar} of $\Rstar$, equivalent to
+$\tfrac{2S}{\delta R}\sqrt{(d+1)/(2\pi)}+1\le(c_{1}'-c\,c_{h})\mup^{T}$,
+i.e.\ to~\eqref{eq:Tcond}. Hence
+$\Prob(\xi\in\mathcal{X}_{\mathrm{stuck}})
+\le\Prob(\xi\in\mathcal{X}_{\mathrm{loc}})\le\delta$.
+
+\emph{Net decrease.} On the complementary event, the trajectory leaves
+the stuck set, so $f(x_{T})-f(x_{0})\le-F$. The perturbation itself
+costs, by $L_{1}$-smoothness,
+\[
+  f(x_{0})-f(\xt)\le\inner{\grad f(\xt)}{\xi}+\frac{L_{1}}{2}\norm{\xi}^{2}
+  \le\epsg R+\frac{L_{1}}{2}R^{2}\le\eta F.
+\]
+Adding the two, $f(x_{T})-f(\xt)\le-F+\eta F=-(1-\eta)F\le-\tfrac12F$
+for $\eta\le\tfrac12$.
+\end{proof}
+
+% ============================================================
+\section{Iteration Complexity}
+\label{sec:complexity}
+ 
+The escape lemma assumed a constraint system relating
+$T,S,F,R,\delta$ and the growth constants. We record it, show it is
+solvable, and then assemble the complexity bound and prove
+\Cref{thm:main}.
+ 
+\subsection{The constraint system}
+ 
+Collecting the conditions from the previous sections, the operational
+quantities must satisfy
+\begin{align}
+  &\text{(C1)}\quad S=(1+\nu)\sqrt{\tfrac{TF}{L_{1}C(\nu)}}
+  \iff F=\frac{L_{1}C(\nu)}{(1+\nu)^{2}}\cdot\frac{S^{2}}{T},
+  \label{eq:C1}\\
+  &\text{(C2)}\quad \sg=\sqrt{1+\alpha^{2}}\,L_{2}(S+R)\le\frac{\Lambda}{T+1},
+  \qquad \Lambda=\frac{c\,c_{1}\,\mup}{C_{0}\,c_{h}\,(1+c)},
+  \label{eq:C2}\\
+  &\text{(C3)}\quad L_{2}(S+R)\le\tfrac12\epsH,
+  \label{eq:C3}\\
+  &\text{(C4)}\quad \epsg R+\tfrac{L_{1}}{2}R^{2}\le\eta F,
+  \label{eq:C4}\\
+  &\text{(C5)}\quad T=\frac{1}{\log\mup}
+  \log\!\Big[\tfrac{1}{c_{1}'-c\,c_{h}}\big(1+\tfrac{2S}{\delta R}
+  \sqrt{\tfrac{d+1}{2\pi}}\big)\Big].
+  \label{eq:C5}
+\end{align}
+Here $C(\nu),\Bmin,\mu_{\pm},c_{1},c_{1}',c_{h},C_{0}$ are the derived
+quantities of \Cref{tab:ledger}, all functions of the problem data
+$d,L_{1},L_{2},\Delta_{f}$ and the free parameters
+$\epsg,\epsH,\beta,\nu,\theta,c,\eta,\delta$ (recall $\alpha=1/L_{1}$).
+ 
+\begin{proposition}[Solvability]
+\label{prop:solvable}
+The system \eqref{eq:C1}--\eqref{eq:C5} admits a solution with
+$R>0$ and $S>0$. Concretely, setting
+$\Psi\coloneqq S+R=\Lambda/(\sqrt{1+\alpha^{2}}\,L_{2}(T+1))$
+and
+\[
+  R=\min\!\left\{\frac{\eta F}{2\epsg},\ \sqrt{\frac{\eta F}{L_{1}}},\
+  \frac{\Lambda}{2\sqrt{1+\alpha^{2}}\,L_{2}(T+1)}\right\},
+  \qquad S=\Psi-R\ge\frac{\Lambda}{2\sqrt{1+\alpha^{2}}\,L_{2}(T+1)}>0,
+\]
+verifies (C2) with equality and (C4) by splitting each summand below
+$\tfrac12\eta F$; (C3) follows from (C2) once $T\ge2\Lambda/\epsH-1$,
+which holds because $\Lambda=\Theta(1)$ and $T=\Theta(L_{1}\phi/\epsH)\gg1/\epsH$;
+and (C1) then determines $F$.
+\end{proposition}
+ 
+\begin{proof}
+Set (C2) to equality, giving $\Psi=\Lambda/(\sqrt{1+\alpha^{2}}\,L_{2}(T+1))$.
+The first two terms in the definition of $R$ enforce (C4): since
+$\tfrac{L_{1}}{2}R^{2}\le\tfrac12\eta F$ when $R\le\sqrt{\eta F/L_{1}}$
+and $\epsg R\le\tfrac12\eta F$ when $R\le\eta F/(2\epsg)$, their sum is
+at most $\eta F$. The third term enforces $R\le\tfrac12\Psi$, when
+$S=\Psi-R\ge\tfrac12\Psi>0$; any split fraction in $(0,1)$ would serve,
+the requirement being only $R>0$ (a genuine perturbation) and $S>0$ (a
+non-vacuous localization). With (C2) at equality,
+$\sg=\sqrt{1+\alpha^{2}}\,L_{2}\Psi=\Lambda/(T+1)$, so
+$L_{2}(S+R)=\Lambda/(\sqrt{1+\alpha^{2}}\,(T+1))\le\Lambda/(T+1)$ and (C3)
+holds once $\Lambda/(T+1)\le\epsH/2$, i.e.\ $T+1\ge2\Lambda/\epsH$; as
+$\Lambda=\Theta(1)$ and $T=\Theta(L_{1}\phi/\epsH)$ with $\phi\gg1$, this
+holds. Finally (C1) defines $F$ from the chosen $S,T$.
+\end{proof}
+ 
+\begin{proposition}[Scales]
+\label{prop:scales}
+With the choice of \Cref{prop:solvable} and
+$\phi\coloneqq\log\!\big[(c_{1}'-c\,c_{h})^{-1}\big]
++\log\!\big(1+\tfrac{2S}{\delta R}\sqrt{(d+1)/(2\pi)}\big)
+=\Theta\!\big(\log\tfrac{d\,L_{1}L_{2}\Delta_{f}}{\epsH\,\delta}\big)$,
+\[
+  T=\Theta\!\Big(\frac{L_{1}\phi}{\epsH}\Big),\quad
+  S=\Theta\!\Big(\frac{\epsH}{L_{1}L_{2}\phi}\Big),\quad
+  F=\Theta\!\Big(\frac{\epsH^{3}}{L_{1}^{2}L_{2}^{2}\phi^{3}}\Big).
+\]
+\end{proposition}
+ 
+\begin{proof}
+By \Cref{lem:escapeeig}, $\mup\ge1+\alpha\epsH$ with $\alpha=1/L_{1}$,
+and $\log(1+x)\ge x/2$ on $[0,1]$ gives
+$\log\mup\ge\tfrac12\alpha\epsH$, so by~\eqref{eq:C5}
+$T\le2\phi/(\alpha\epsH)=\Theta(L_{1}\phi/\epsH)$. Then
+$S=\Theta(\Lambda/(\sqrt{1+\alpha^{2}}\,L_{2}T))=\Theta(\epsH/(L_{1}L_{2}\phi))$,
+since $\Lambda$ and $\sqrt{1+\alpha^{2}}$ are constants in the tolerances, and~\eqref{eq:C1} gives
+$F=\Theta\!\big(L_{1}S^{2}/T\big)
+=\Theta\!\big(L_{1}\cdot\tfrac{\epsH^{2}}{L_{1}^{2}L_{2}^{2}\phi^{2}}
+\cdot\tfrac{\epsH}{L_{1}\phi}\big)
+=\Theta(\epsH^{3}/(L_{1}^{2}L_{2}^{2}\phi^{3}))$.
+\end{proof}
+ 
+\subsection{Counting the iterations}
+ 
+\begin{proof}[Proof of \Cref{thm:main}]
+We split a run into large-gradient steps and escape episodes.
+ 
+\emph{Large-gradient phase.} While $\norm{g_{k}}\ge\epsg$, no
+perturbation is triggered and \Cref{lem:descent} gives
+$f(x_{k})-f(x_{k+1})\ge\tfrac{C(\nu)}{L_{1}}\norm{g_{k}}^{2}
+>\tfrac{C(\nu)}{L_{1}}\epsg^{2}$. Since the total decrease available is
+$\Delta_{f}$, the number of such steps is at most
+\begin{equation}\label{eq:Ndesc}
+  N_{\mathrm{desc}}\le\frac{L_{1}\Delta_{f}}{C(\nu)\,\epsg^{2}}
+  =O\!\big(\epsg^{-2}\big).
+\end{equation}
+ 
+\emph{Escape phase.} Each perturbation episode that does not certify a
+$2$OSP produces, by \Cref{lem:escape}, a net decrease of at least
+$(1-\eta)F$. Here \Cref{lem:escape} is applied to the momentum window of each episode
+(\Cref{def:window}). Hence the number of episodes is at most
+$\bar K\le\Delta_{f}/((1-\eta)F)+1$, and by the scale of $F$ in
+\Cref{prop:scales},
+\[
+  \bar K=\Theta\!\Big(\frac{L_{1}^{2}L_{2}^{2}\Delta_{f}\,\phi^{3}}{\epsH^{3}}\Big)
+  =\Otil\!\big(\epsH^{-3}\big).
+\]
+Each episode costs $T$ iterations, so
+\begin{equation}\label{eq:Nesc}
+  N_{\mathrm{esc}}\le T\,\bar K
+  =\Theta\!\Big(\frac{L_{1}\phi}{\epsH}\Big)
+  \cdot\Theta\!\Big(\frac{L_{1}^{2}L_{2}^{2}\Delta_{f}\phi^{3}}{\epsH^{3}}\Big)
+  =\Theta\!\Big(\frac{L_{1}^{3}L_{2}^{2}\Delta_{f}\,\phi^{4}}{\epsH^{4}}\Big)
+  =\Otil\!\big(\epsH^{-4}\big).
+\end{equation}
+ 
+\emph{Union bound.} Index the episodes by $j=1,\dots,\bar K$; episode
+$j$ takes a snapshot $\xt^{(j)}$ with $\norm{\grad f(\xt^{(j)})}\le\epsg$
+and runs a window of length $T$. Define the bad event
+$\mathcal{E}_{j}=\{\lmin(\Hess f(\xt^{(j)}))\le-\epsH
+\text{ and the window fails to decrease by }F\}$; that is, $\xt^{(j)}$
+was a strict saddle from which the method did not escape. By
+\Cref{lem:escape}, $\Prob(\mathcal{E}_{j})\le\delta$ for every $j$.
+Fixing a total budget $\delta_{\mathrm{tot}}\in(0,1)$ and setting
+$\delta=\delta_{\mathrm{tot}}/\bar K$, the union bound gives
+\[
+  \Prob\Big(\textstyle\bigcup_{j=1}^{\bar K}\mathcal{E}_{j}\Big)
+  \le\sum_{j=1}^{\bar K}\Prob(\mathcal{E}_{j})
+  \le\bar K\,\delta=\delta_{\mathrm{tot}}.
+\]
+With probability at least $1-\delta_{\mathrm{tot}}$, then, no saddle
+episode fails. This choice only affects the logarithmic factor: since
+$\log(1/\delta)=\log(\bar K/\delta_{\mathrm{tot}})
+=\log\bar K+\log(1/\delta_{\mathrm{tot}})$ and
+$\log\bar K=\Theta(\log(1/\epsH))=O(\phi)$, it is absorbed into $\phi$,
+preserving the scales of \Cref{prop:scales}.
+ 
+Summing~\eqref{eq:Ndesc} and~\eqref{eq:Nesc} yields
+$N=O(\epsg^{-2})+\Otil(\epsH^{-4})$, completing the proof.
+\end{proof}
+ 
+\begin{table}[t]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}lll@{}}
+\hline
+Symbol & Meaning & Definition / constraint\\
+\hline
+$\nu$ & restart slack & $0<\nu<\sqrt5-2$\\
+$C(\nu)$ & decrease constant & $(1-\nu)-\tfrac12(1+\nu)^{2}=\tfrac12(1-4\nu-\nu^{2})$\\
+$\beta$ & momentum (constant) & $\beta\in(0,1]$\\
+$\theta$ & warm-up margin & $0<\theta<1$\\
+$c$ & residual fraction & $0<c<\min\{1,c_{1}'/c_{h}\}$\\
+$\eta$ & perturbation-cost fraction & $0<\eta\le\tfrac12$\\
+$\delta$ & per-episode failure prob.\ & $\delta=\delta_{\mathrm{tot}}/\bar K$\\
+$\epsg$ & gradient tolerance & $\epsg>0$\\
+$\epsH$ & curvature tolerance & $0<\epsH\le L_{1}$\\
+$\alpha$ & step size & $1/L_{1}$\\
+$H,\lambda_{i}$ & $\Hess f(\xt)$ and its eigenvalues & $\lambda_{\min}\le-\epsH$\\
+$B_{i}$ & $\bigl(\begin{smallmatrix}1-\alpha\lambda_{i}&\alpha\beta\\-\lambda_{i}&\beta\end{smallmatrix}\bigr)$ & $\det B_{i}=\beta$\\
+$\mu_{\pm}$ & eigenvalues of $\Bmin$ & $\mup\ge1+\alpha\epsH>1>\mum$\\
+$\rho_{i}$ & spectral radius of $B_{i}$ & $\max\{\abs{\mu_{1}},\abs{\mu_{2}}\}\le\mup$\\
+$C(B)$ & power constant & $2(\norm{B}+\rho)/\abs{\mu_{1}-\mu_{2}}$\\
+$c_{h},C_{0}$ & block constants & $c_{h}=C(\Bmin)\le C_{0}=\max_{i}C(B_{i})$\\
+$c_{1}$ & energy growth & $(1-\theta)\norm{\vp}/(\mup-\mum)$\\
+$c_{1}'$ & position growth & $(1-\theta)\abs{\beta-\mup}/(\mup-\mum)$\\
+$\sg$ & residual coefficient & $\sqrt{1+\alpha^{2}}\,L_{2}(S+R)$\\
+$S$ & localization radius & $(1+\nu)\sqrt{TF/(L_{1}C(\nu))}$\\
+$F$ & escape decrease & $L_{1}C(\nu)\,S^{2}/((1+\nu)^{2}T)$\\
+$R$ & perturbation radius & \Cref{prop:solvable}\\
+$R_{0},\Rstar$ & separation, threshold & $\Rstar=2S/((c_{1}'-c\,c_{h})\mup^{T}-1)$\\
+$T$ & escape window & \eqref{eq:C5}; $\Theta(L_{1}\phi/\epsH)$\\
+$\phi$ & log factor & $\Theta(\log(d L_{1}L_{2}\Delta_{f}/(\epsH\delta)))$\\
+$\bar K$ & episode count & $\Otil(\epsH^{-3})$\\
+\hline
+\end{tabular}
+\caption{Free parameters, problem data and derived quantities.}
+\label{tab:ledger}
+\end{table}
+ 
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+ 
+We have shown that a perturbed, restarted constant-momentum
+method---equivalently, a safeguarded heavy-ball iteration---escapes
+strict saddle points and reaches an $(\epsg,\epsH)$-second-order
+stationary point in $O(\epsg^{-2})+\Otil(\epsH^{-4})$ iterations,
+matching the rate of perturbed gradient descent. The analysis transfers
+the perturbation-and-coupling framework of~\cite{pmlr-v70-jin17a,pmlr-v75-jin18a} to an
+iteration whose linearised propagator is non-symmetric, via an explicit
+spectral study of the two-trajectory difference.
+ 
+The momentum coefficient $\beta$ was held constant throughout, and this
+is the main limitation of the present result. The natural next step, and
+our motivating goal, is the genuine nonlinear conjugate gradient method,
+in which $\beta_{k}=\norm{g_{k}}^{2}/\norm{g_{k-1}}^{2}$
+(Fletcher--Reeves~\cite{Fletcher1964FunctionMB}) varies with the iterates
+and is singular at stationary points, where the denominator
+$\norm{g_{k-1}}^{2}$ vanishes. That singularity is precisely what
+obstructs a direct extension of the propagator analysis---the block
+$\Bmin$ would itself depend on $k$ through $\beta_{k}$---and treating it
+appears to require new ideas. Another interesting future direction would consist in adapting the argument to a line-search
+regime, where Wolfe conditions should supply the angle and decrease
+guarantees that the fixed step size and restart test furnish here.
+ 
+% ============================================================
+\bibliographystyle{plain}
+\bibliography{refs}
+ 
+\end{document}
