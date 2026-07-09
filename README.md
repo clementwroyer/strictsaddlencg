@@ -8,11 +8,11 @@ Starting point: [Paper by Chan--Renous-Legoubin and Royer on nonlinear CG (NCG) 
 - Definition of strict saddle: [A paper by Rong Ge et al on matrix problems](https://proceedings.mlr.press/v70/ge17a.html)
 - See also [Wright and Ma, Chapter 7](https://book-wright-ma.github.io/Book-WM-20210422.pdf)
 
-*Step 1.1: Analyze a method combining NCG with negative curvature in the spirit of (Wright and Ma, section 9.3) for generic nonconvex functions assuming access to Lipschitz constants.*
+*Step 1.1: Analyze a method combining NCG with negative curvature in the spirit of (Wright and Ma, section 9.3) for generic nonconvex functions assuming access to Lipschitz constants. [STATUS: DONE]*
 
-*Step 1.2: Adapt the analysis to the strict saddle setting.*
+*Step 1.2: Adapt the analysis to the strict saddle setting. [STATUS: DONE]*
 
-*Step 1.3: Replace the use of Lipschitz constants by line searches.* (see Wright and Ma or [Royer and Wright](https://arxiv.org/abs/1706.03131) for illustration).*
+*Step 1.3: Replace the use of Lipschitz constants by line searches. (see Wright and Ma or [Royer and Wright](https://arxiv.org/abs/1706.03131) for illustration). [STATUS: DONE?]*
 
 ## Question 2: Can we show that NCG avoids strict saddle points almost surely?
 
@@ -23,11 +23,13 @@ Starting point: [Paper by Chan--Renous-Legoubin and Royer on nonlinear CG (NCG) 
 
 - [A view of nonlinear CG (Fletcher/Reeves) as discretization of a dynamical system](https://link.springer.com/article/10.1007/s00466-020-01849-7)
 
-*Step 2.1. Adapt the GD analysis to show that NCG also escapes saddle points (with fixed stepsize).*
+*Step 2.1. Adapt the GD analysis to show that NCG also escapes saddle points (with fixed stepsize). [STATUS: DONE WITH FIXED MOMENTUM PARAMETER]*
 
 *Step 2.2. Study the line-search paper to show that NCG with line search also escapes saddle points.*
 
 *Step 2.3. Propose a perturbed variant?*
+
+**STATUS (JULY 2026): Question 2 will be combined with Question 1. The idea would be to use restarted nonlinear CG for large gradient steps, then switch to a non-restarted method (heavy-ball, GD) for perturbed steps.**
 
 ## Question 3: Can we show that the nonconvex regression problem is strict saddle?
 
